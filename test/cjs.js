@@ -4,7 +4,7 @@ import { transformFileSync } from '@babel/core';
 import { trim } from './util';
 import plugin from '../src';
 
-describe('cjs modules should work', () => {
+describe.skip('cjs modules should work', () => {
   it('when plugin is first', () => {
     const options = {
       babelrc: false,

@@ -12,7 +12,8 @@ describe('Plugin', () => {
     plugins: [plugin]
   };
 
-  fs.readdirSync(fixturesDir).map((caseName) => {
+  ['transform-import-wildcard'].map((caseName) => {
+  // fs.readdirSync(fixturesDir).map((caseName) => {
     const fixtureDir = path.join(fixturesDir, caseName);
     const inputPath = path.join(fixtureDir, 'input.js');
 

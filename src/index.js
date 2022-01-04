@@ -1,4 +1,5 @@
 import template from '@babel/template';
+import { variableDeclaration } from '@babel/types';
 
 export default function ({types: t}) {
   const defaultIdentifier = t.identifier('default');
@@ -18,6 +19,69 @@ export default function ({types: t}) {
       BODY
     }
   `, {sourceType: 'module'});
+
+  const buildRestoreImportTemplate = template(`
+    Object.keys(_rewireProxyHandlers).forEach(k1 => Object.keys(_rewireProxyHandlers[k1]).forEach(k2 =>  delete _rewireProxyHandlers[k1][k2]));
+  `);
+
+  const buildRestoreNonProxyTemplate = template(`
+    if (typeof INTERNALNAME !== 'object' && typeof INTERNALNAME !== 'function') {
+      EXTERNALNAME = INTERNALNAME;
+    }
+  `);
+
+  const buildRewireProxyHandlers = template(`
+    const _rewireProxyHandlers = {};
+  `);
+
+  const makeRewireProxySetup = template(`
+    function _rewireProxyIfNeeded(obj, name) {
+      const t = typeof obj;
+      if (t === 'function' || t === 'object') {
+        const rwProx = _rewireProxyHandlers[name] = {};
+        return new Proxy(obj, rwProx);
+      }
+      return obj;
+    }
+    function _rewireApplyProxy(maybeProxy, name, val) {
+      const existingProxyHandler = _rewireProxyHandlers[name];
+      if (existingProxyHandler && typeof val === 'object') {
+        Object.keys(existingProxyHandler).forEach(k => delete existingProxyHandler[k]);
+        Object.keys(val).forEach(k => existingProxyHandler[k] = val[k]);
+        return maybeProxy;
+      } else if (existingProxyHandler) {
+        throw new Error('When rewiring proxied imports, must provide an instance of a proxy handler see: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy/Proxy#handler_functions');
+      } else {
+        return val;
+      }
+    }
+  `);
+
+  const proxyTemplate = template(`
+    let EXTERNALNAME = _rewireProxyIfNeeded(INTERNALNAME, EXTERNALNAMESTR);
+  `);
+
+  const proxyExportTemplate = template(`
+    export function EXPORTFUNCNAME(val) {
+      EXTERNALNAME = _rewireApplyProxy(EXTERNALNAME, EXTERNALNAMESTR, val);
+    }
+  `);
+
+  function buildExportProxyTemplate(externalName) {
+    return proxyExportTemplate({
+      EXPORTFUNCNAME: t.identifier(`rewire$${externalName}`),
+      EXTERNALNAME: t.identifier(externalName),
+      EXTERNALNAMESTR: t.stringLiteral(externalName),
+    });
+  }
+
+  function buildProxyTemplate(externalName) {
+    return proxyTemplate({
+      EXTERNALNAME: t.identifier(externalName),
+      INTERNALNAME: t.identifier(`_${externalName}`),
+      EXTERNALNAMESTR: t.stringLiteral(externalName),
+    });
+  }
 
   function buildNamedExport(local, exported) {
     return markVisited(t.exportNamedDeclaration(null, [
@@ -42,9 +106,10 @@ export default function ({types: t}) {
       Program: {
         enter(path, state) {
           state.exports = [];
+          state.imports = [];
         },
-        exit(path, {exports}) {
-          if (!exports.length) return;
+        exit(path, {exports, imports}) {
+          if (!exports.length && !imports.length) return;
 
           // de-duplicate the exports
           const unique = exports.reduce((acc, e) => {
@@ -88,22 +153,51 @@ export default function ({types: t}) {
               })
             );
           });
+          // generate import proxy functions
+          imports.forEach((im) => {
+            stubs.push(markVisited(buildExportProxyTemplate(im.externalName)));
+          });
 
           // generate restore function
           const restore = path.scope.hasOwnBinding('restore') ? t.identifier('restore$rewire') : restoreIdentifier;
           const assignments = rewired.map(({local, original}) => t.expressionStatement(t.assignmentExpression('=', local, original)));
+          assignments.push(buildRestoreImportTemplate());
+        
+          imports.forEach((im) => {
+            assignments.push(buildRestoreNonProxyTemplate({ INTERNALNAME: t.identifier(im.internalName), EXTERNALNAME: t.identifier(im.externalName) }));
+          });
 
           const body = [
             ...stubs,
-            markVisited(buildRestore({RESTORE: restore, BODY: assignments}))
+            markVisited(buildRestore({RESTORE: restore, BODY: assignments})),
+            ...[...makeRewireProxySetup({})].map(markVisited)
           ];
 
           if (tempVars.length) {
             body.unshift(t.variableDeclaration('var', tempVars));
           }
-
+          const pt = buildRewireProxyHandlers({});
+          path.unshiftContainer('body', pt);
           path.pushContainer('body', body);
         }
+      },
+      ImportDeclaration(path, {imports, opts}) {
+        if (path.node[VISITED]) return;
+        const specifiers = path.node.specifiers;
+        for (const s of specifiers) {
+          if (s.type === 'ImportDefaultSpecifier' || s.type === 'ImportSpecifier' || s.type === 'ImportNamespaceSpecifier' ) {
+            const externalName = s.local.name;
+            if (externalName.startsWith('rewire$')) {
+              //don't mess with imports of rewire functions
+              continue;
+            }
+            const internalName = `_${externalName}`;
+            s.local.name = internalName;
+            imports.push({ externalName, internalName });
+            path.insertAfter(buildProxyTemplate(externalName));
+          }
+        }
+        path.replaceWith(markVisited(t.ImportDeclaration(specifiers, path.node.source)));
       },
       // export default
       ExportDefaultDeclaration(path, {exports, opts}) {

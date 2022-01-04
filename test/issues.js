@@ -4,7 +4,7 @@ import { transformFileSync } from '@babel/core';
 import { trim } from './util';
 import plugin from '../src';
 
-describe('issues', () => {
+describe.skip('issues', () => {
   const options = {
     babelrc: false,
     presets: ['@babel/preset-env'],
