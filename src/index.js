@@ -1,5 +1,4 @@
 import template from '@babel/template';
-import { variableDeclaration } from '@babel/types';
 
 export default function ({types: t}) {
   const defaultIdentifier = t.identifier('default');
@@ -31,49 +30,74 @@ export default function ({types: t}) {
   `);
 
   const buildRewireProxyHandlers = template(`
-    const _rewireProxyHandlers = {};
+    const _rewireObjects = {};
   `);
 
-  const makeRewireProxySetup = template(`
-    function _rewireProxyIfNeeded(obj, name) {
-      const t = typeof obj;
-      if (t === 'function' || t === 'object') {
-        const rwProx = _rewireProxyHandlers[name] = {};
+  const __RewireAPI__ = {
+    rewireProxyIfNeeded: (obj, name) => {
+      const type = typeof obj;
+      if (type === 'function' || type === 'object') {
+        const rwProx = {};
+        _rewireObjects[name] = {
+          proxyHandler: rwProx,
+          original: obj,
+        };
         return new Proxy(obj, rwProx);
       }
       return obj;
-    }
-    function _rewireApplyProxy(maybeProxy, name, val) {
-      const existingProxyHandler = _rewireProxyHandlers[name];
-      if (existingProxyHandler && typeof val === 'object') {
-        Object.keys(existingProxyHandler).forEach(k => delete existingProxyHandler[k]);
-        Object.keys(val).forEach(k => existingProxyHandler[k] = val[k]);
-        return maybeProxy;
-      } else if (existingProxyHandler) {
-        throw new Error('When rewiring proxied imports, must provide an instance of a proxy handler see: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy/Proxy#handler_functions');
+    },
+    rewireProxy: (name, proxyHandler) => {
+      const rw = _rewireObjects[name];
+      if (!rw || !rw.proxyHandler) {
+        throw new Error('Cannot rewire ' + name);
+      }
+      Object.keys(rw.proxyHandler).forEach(k => delete rw.proxyHandler[k]);
+      Object.keys(proxyHandler).forEach(k => rw.proxyHandler[k] = proxyHandler[k]);
+    },
+    __Rewire__: (name, val) => {
+      const rw = _rewireObjects[name];
+      if (!rw) {
+        throw new Error('Cannot rewire ' + name);
+      }
+      if (rw.proxyHandler) {
+        if (typeof rw.original === 'function' && typeof val === 'function') {
+          this.rewireProxy(name, { apply: () => val() });
+        }
+        if (typeof rw.original === 'object' && typeof val === 'object') {
+          this.rewireProxy(name, {
+            get: (target, prop, receiver) => {
+              if (val[prop] !== undefined) {
+                return val[prop];
+              }
+              return Reflect.get(target, prop, receiver);
+            }
+          });
+        }
       } else {
-        return val;
+        rw.preRewired = rw.getterFn();
+      }
+    },
+    __ResetDependency__: function (name) {
+      const rw = _rewireObjects[name];
+      if (!rw) throw new Error('Cannot rewire ' + name);
+      if (rw.proxyHandler) {
+        Object.keys(rw.proxyHandler).forEach(k => delete rw.proxyHandler[k]);
+      } else if (rw.setterFn) {
+        if (rw.preRewired) {
+          rw.setterFn(rw.preRewired);
+          delete rw.preRewired;
+        }
       }
     }
-  `);
+  };
 
   const proxyTemplate = template(`
-    let EXTERNALNAME = _rewireProxyIfNeeded(INTERNALNAME, EXTERNALNAMESTR);
+    let EXTERNALNAME = __RewireAPI__.rewireProxyIfNeeded(INTERNALNAME, EXTERNALNAMESTR);
+    _rewireObjects[EXTERNALNAMESTR] = {
+      setterFn: (val) => EXTERNALNAME = val;
+      getterFn: () => EXTERNALNAME;
+    };
   `);
-
-  const proxyExportTemplate = template(`
-    export function EXPORTFUNCNAME(val) {
-      EXTERNALNAME = _rewireApplyProxy(EXTERNALNAME, EXTERNALNAMESTR, val);
-    }
-  `);
-
-  function buildExportProxyTemplate(externalName) {
-    return proxyExportTemplate({
-      EXPORTFUNCNAME: t.identifier(`rewire$${externalName}`),
-      EXTERNALNAME: t.identifier(externalName),
-      EXTERNALNAMESTR: t.stringLiteral(externalName),
-    });
-  }
 
   function buildProxyTemplate(externalName) {
     return proxyTemplate({
@@ -101,7 +125,7 @@ export default function ({types: t}) {
   }
 
   return {
-    name: 'rewire-exports',
+    name: 'rewire-proxies',
     visitor: {
       Program: {
         enter(path, state) {
