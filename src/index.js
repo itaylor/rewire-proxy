@@ -59,7 +59,12 @@ export default function ({types: t}) {
           // don't modify "private" funcs prefixed with _ (babel adds some)
           const name = path?.node?.declarations[0]?.id?.name;
           if (name && name.startsWith('_')) return;
-          
+
+          //TODO: handle destructured assignment (kinda complex)...
+          if (path?.node?.declarations[0]?.id.type === 'ObjectPattern') {
+            markVisited(path.node);
+            return;
+          }          
           const decls = path.node.declarations;
           path.replaceWithMultiple(decls.map((d) =>  {
             return markVisited(buildProxyTemplate(d.id.name, d.init));
