@@ -9,9 +9,12 @@ export default function ({types: t}) {
   const buildRewireObjects = template(`
   //  import _rewireProxyRuntime from '${__dirname}/rewireProxyRuntime';
     import _rewireProxyRuntime from '@itaylor/babel-plugin-rewire-proxy/lib/rewireProxyRuntime.js';
-    const { _$rwRuntime, _$rwProx } = _rewireProxyRuntime();
   `);
 
+  const buildRewireVarDecl = template(`
+    const { _$rwRuntime, _$rwProx } = _rewireProxyRuntime();
+  `);
+  
   const proxyTemplate = template(`
     let EXTERNALNAME = _$rwProx(DECL, EXTERNALNAMESTR, () => EXTERNALNAME , (val) => EXTERNALNAME = val);`);
 
@@ -48,8 +51,11 @@ export default function ({types: t}) {
             t.exportNamedDeclaration(null, exports.map(e => {
               return t.exportSpecifier(e.local, e.external)
             }))
-          ));          
-          path.unshiftContainer('body', buildRewireObjects({}).map(markVisited));
+          ));
+          const varDecl = markVisited(buildRewireVarDecl());
+          const [varDeclPath] = path.unshiftContainer('body', varDecl);
+          path.scope.registerDeclaration(varDeclPath);
+          path.unshiftContainer('body', markVisited(buildRewireObjects({})));
         }
       },
       VariableDeclaration(path) {
