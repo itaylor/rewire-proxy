@@ -1,6 +1,6 @@
 {
-  "name": "@itaylor/babel-plugin-rewire-exports",
-  "version": "3.0.0",
+  "name": "@itaylor/babel-plugin-rewire-proxy",
+  "version": "0.0.1",
   "description": "Babel plugin for stubbing (ES6, ES2015) module exports",
   "main": "lib/index.js",
   "scripts": {
@@ -19,20 +19,9 @@
   "keywords": [
     "babel",
     "plugin",
-    "rewire",
-    "babel-plugin",
-    "esm",
-    "unit-testing",
-    "webpack",
-    "rollup",
-    "systemjs",
-    "browserify",
-    "browser",
-    "node",
-    "jest",
-    "karma"
+    "rewire"
   ],
-  "author": "Aliaksei Sapach <dreamsonic@tut.by>",
+  "author": "ian.b.taylor@gmail.com",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/asapach/babel-plugin-rewire-exports/issues"
