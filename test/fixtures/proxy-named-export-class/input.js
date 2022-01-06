@@ -1,3 +1,5 @@
+import { foo } from "../../import/fakeLibrary";
+
 export class Foob {
   someMethod() {
     return 'cool';

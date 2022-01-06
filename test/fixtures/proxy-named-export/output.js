@@ -1,31 +1,26 @@
-import _rewireProxyRuntime from '/Users/itaylor/os/babel-plugin-rewire-exports/src/rewireProxyRuntime.js';
+import _rewireProxyRuntime from '/Users/itaylor/os/babel-plugin-rewire-exports/src/rewireProxyRuntime';
 
-const _$rwRuntime = _rewireProxyRuntime();
+const {
+  _$rwRuntime,
+  _$rwProx
+} = _rewireProxyRuntime();
 
-const _$rwProx = _$rwRuntime._add;
-export { _$rwRuntime as __RewireAPI__ };
-const foo_rewire = {
+let foo = _$rwProx({
   bar: 'bar'
-};
+}, "foo", () => foo, val => foo = val);
 
-let foo = _$rwProx(foo_rewire, "foo", () => foo, val => foo = val);
-
-const fooFn_rewire = () => {
+let fooFn = _$rwProx(() => {
   const secondLevelVar = foo.bar;
   return secondLevelVar + ' baz';
-};
+}, "fooFn", () => fooFn, val => fooFn = val);
 
-let fooFn = _$rwProx(fooFn_rewire, "fooFn", () => fooFn, val => fooFn = val);
-
-const barFn_rewire = function () {
+let barFn_rewire = _$rwProx(function barFn() {
   const secondLevelVar = foo.bar;
   return secondLevelVar + ' bat';
-};
-
-let barFn_proxy_rewire = _$rwProx(barFn_rewire, "barFn", () => barFn);
+}, "barFn", () => barFn);
 
 function barFn(...args) {
-  return barFn_proxy_rewire(...args);
+  return barFn_rewire(...args);
 }
 
-export { fooFn, barFn };
+export { fooFn, barFn, _$rwRuntime as __RewireAPI__ };

@@ -1,11 +1,13 @@
-import _rewireProxyRuntime from '/Users/itaylor/os/babel-plugin-rewire-exports/src/rewireProxyRuntime.js';
+import _rewireProxyRuntime from '/Users/itaylor/os/babel-plugin-rewire-exports/src/rewireProxyRuntime';
 
-const _$rwRuntime = _rewireProxyRuntime();
+const {
+  _$rwRuntime,
+  _$rwProx
+} = _rewireProxyRuntime();
 
-const _$rwProx = _$rwRuntime._add;
-export { _$rwRuntime as __RewireAPI__ };
 import Somelib_rewire from 'some-non-existent-lib';
 
 let Somelib = _$rwProx(Somelib_rewire, "Somelib", () => Somelib, val => Somelib = val);
 
 Somelib.fooBar();
+export { _$rwRuntime as __RewireAPI__ };

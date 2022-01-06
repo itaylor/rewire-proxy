@@ -7,25 +7,25 @@ export default function ({types: t}) {
 
   // TODO: bundle as separate package
   const buildRewireObjects = template(`
-    import _rewireProxyRuntime from '@itaylor/babel-plugin-rewire-proxy/lib/rewireProxyRuntime.js'
-    const _$rwRuntime = _rewireProxyRuntime();
-    const _$rwProx = _$rwRuntime._add;
-    export { _$rwRuntime as __RewireAPI__ }`);
+    import _rewireProxyRuntime from '${__dirname}/rewireProxyRuntime';
+  //   import _rewireProxyRuntime from '@itaylor/babel-plugin-rewire-proxy/lib/rewireProxyRuntime.js';
+    const { _$rwRuntime, _$rwProx } = _rewireProxyRuntime();
+  `);
 
   const proxyTemplate = template(`
-    let EXTERNALNAME = _$rwProx(INTERNALNAME, EXTERNALNAMESTR, () => EXTERNALNAME , (val) => EXTERNALNAME = val);`);
+    let EXTERNALNAME = _$rwProx(DECL, EXTERNALNAMESTR, () => EXTERNALNAME , (val) => EXTERNALNAME = val);`);
 
   const functionDeclProxyTemplate = template(`
-    const INTERNALNAME = FUNCDECL;
-    let PROXYNAME = _$rwProx(INTERNALNAME, EXTERNALNAMESTR, () => EXTERNALNAME );
+    let PROXYNAME = _$rwProx(FUNCDECL, EXTERNALNAMESTR, () => EXTERNALNAME );
     function EXTERNALNAME(...args) {
       return PROXYNAME(...args);
     }`);
   
-  function buildProxyTemplate(externalName) {
+  function buildProxyTemplate(externalName, decl) {
     return proxyTemplate({
+      DECL: decl,
       EXTERNALNAME: t.identifier(externalName),
-      INTERNALNAME: t.identifier(`${externalName}_rewire`),
+     // INTERNALNAME: t.identifier(`${externalName}_rewire`),
       EXTERNALNAMESTR: t.stringLiteral(externalName),
     });
   }
@@ -43,23 +43,12 @@ export default function ({types: t}) {
           state.exports = [];
         },
         exit(path, {exports}) {
-          // // de-duplicate the exports (do we really need this???)
-          // const unique = exports.reduce((acc, e) => {
-          //   const key = e.external.name;
-          //   if (!acc[key]) {
-          //     acc[key] = e;
-          //   }
-          //   return acc;
-          // }, {});
-          // exports = Object.keys(unique).map(k => unique[k]);
-          
-          if (exports.length) {
-            path.pushContainer('body', markVisited(
-              t.exportNamedDeclaration(null, exports.map(e => {
-                return t.exportSpecifier(e.local, e.external)
-              }))
-            ));
-          }          
+          exports.push({ local: t.identifier('_$rwRuntime'), external: t.identifier('__RewireAPI__') });
+          path.pushContainer('body', markVisited(
+            t.exportNamedDeclaration(null, exports.map(e => {
+              return t.exportSpecifier(e.local, e.external)
+            }))
+          ));          
           path.unshiftContainer('body', buildRewireObjects({}).map(markVisited));
         }
       },
@@ -71,27 +60,18 @@ export default function ({types: t}) {
           const name = path?.node?.declarations[0]?.id?.name;
           if (name && name.startsWith('_')) return;
           
-          const newDecls = path.node.declarations.map((d) => {
-            const cloned = t.cloneNode(d, true);
-            const origName = cloned.id.name;
-            cloned.id.name = `${origName}_rewire`;
-            return { origName, newName: cloned.id.name, node:cloned };
-          })
-          path.replaceWith(t.variableDeclaration('const', newDecls.map(nd => nd.node)));
-          markVisited(path.node);
-          newDecls.reverse().forEach(({ origName }) => {
-            path.insertAfter(markVisited(buildProxyTemplate(origName)));
-          });
+          const decls = path.node.declarations;
+          path.replaceWithMultiple(decls.map((d) =>  {
+            return markVisited(buildProxyTemplate(d.id.name, d.init));
+          }));
         }
       },
       ClassDeclaration(path) {
         if (path.node[VISITED]) return;
         if (path?.parent?.type === 'Program') {
-          const cloned = t.cloneNode(path.node);
-          const origName = cloned.id.name;
-          cloned.id.name = `${origName}_rewire`;
-          path.replaceWith(markVisited(cloned));
-          path.insertAfter(markVisited(buildProxyTemplate(origName)));
+          // convert ClassDecl to ClassExpression
+          path.node.type = 'ClassExpression';
+          path.replaceWith(markVisited(buildProxyTemplate(path.node.id.name, path.node)));
         }
       },
       FunctionDeclaration(path) {
@@ -110,11 +90,9 @@ export default function ({types: t}) {
 
           const newFnExpression = t.cloneNode(path.node);
           newFnExpression.type = 'FunctionExpression'; //A functionExpression is just like a FunctionDeclaration, without a name.
-          delete newFnExpression.id;
           const statements = functionDeclProxyTemplate({
-            PROXYNAME: t.identifier(`${origId}_proxy_rewire`),
+            PROXYNAME: t.identifier(`${origId}_rewire`),
             FUNCDECL: newFnExpression,
-            INTERNALNAME: t.identifier(`${origId}_rewire`),
             EXTERNALNAME: t.identifier(origId),
             EXTERNALNAMESTR: t.stringLiteral(origId),
           });
@@ -134,7 +112,7 @@ export default function ({types: t}) {
             }
             const internalName = `${externalName}_rewire`;
             s.local.name = internalName;
-            path.insertAfter(markVisited(buildProxyTemplate(externalName)));
+            path.insertAfter(markVisited(buildProxyTemplate(externalName, t.identifier(internalName))));
           }
         }
         path.replaceWith(markVisited(t.ImportDeclaration(specifiers, path.node.source)));
@@ -148,7 +126,7 @@ export default function ({types: t}) {
         const binding = isIdentifier && path.scope.getBinding(declaration.name);
         if (isIdentifier && binding) {
           // export default foo
-          exports.push({ local: declaration.id, external: defaultIdentifier });
+          exports.push({ local: declaration, external: defaultIdentifier });
         } else if(t.isFunctionDeclaration(declaration) || t.isClassDeclaration(declaration)) {
           // export default class {
           // export default function {}

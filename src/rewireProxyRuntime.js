@@ -1,18 +1,20 @@
 
 export default function createRewireProxyRuntime() {
   const _rewireObjects = {};
+
+  function _$rwProx(obj, name, getterFn, setterFn) {
+    const type = typeof obj;
+    _rewireObjects[name] = { setterFn, getterFn };
+    if (type === 'function' || type === 'object') {
+      const rwProx = {};
+      _rewireObjects[name].proxyHandler = rwProx;
+      _rewireObjects[name].original = obj;
+      return new Proxy(obj, rwProx);
+    }
+    return obj;
+  }
+
   const that = {
-    _add: (obj, name, getterFn, setterFn) => {
-      const type = typeof obj;
-      _rewireObjects[name] = { setterFn, getterFn };
-      if (type === 'function' || type === 'object') {
-        const rwProx = {};
-        _rewireObjects[name].proxyHandler = rwProx;
-        _rewireObjects[name].original = obj;
-        return new Proxy(obj, rwProx);
-      }
-      return obj;
-    },
     rewireProxy: (name, proxyHandler) => {
       const rw = _rewireObjects[name];
       if (!rw || !rw.proxyHandler) {
@@ -58,5 +60,8 @@ export default function createRewireProxyRuntime() {
       }
     }
   };
-  return that;
+  return {
+    _$rwProx,
+    _$rwRuntime: that
+  };
 }

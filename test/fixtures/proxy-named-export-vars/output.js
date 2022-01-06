@@ -1,27 +1,18 @@
-import _rewireProxyRuntime from '/Users/itaylor/os/babel-plugin-rewire-exports/src/rewireProxyRuntime.js';
+import _rewireProxyRuntime from '/Users/itaylor/os/babel-plugin-rewire-exports/src/rewireProxyRuntime';
 
-const _$rwRuntime = _rewireProxyRuntime();
+const {
+  _$rwRuntime,
+  _$rwProx
+} = _rewireProxyRuntime();
 
-const _$rwProx = _$rwRuntime._add;
-export { _$rwRuntime as __RewireAPI__ };
-const foo_rewire = 1;
+let foo = _$rwProx(1, "foo", () => foo, val => foo = val);
 
-let foo = _$rwProx(foo_rewire, "foo", () => foo, val => foo = val);
+let bar = _$rwProx(2, "bar", () => bar, val => bar = val);
 
-const bar_rewire = 2;
+let baz = _$rwProx(3, "baz", () => baz, val => baz = val);
 
-let bar = _$rwProx(bar_rewire, "bar", () => bar, val => bar = val);
+let boop = _$rwProx(0, "boop", () => boop, val => boop = val);
 
-const baz_rewire = 3;
+let derp = _$rwProx(1, "derp", () => derp, val => derp = val);
 
-let baz = _$rwProx(baz_rewire, "baz", () => baz, val => baz = val);
-
-const boop_rewire = 0;
-
-let boop = _$rwProx(boop_rewire, "boop", () => boop, val => boop = val);
-
-const derp_rewire = 1;
-
-let derp = _$rwProx(derp_rewire, "derp", () => derp, val => derp = val);
-
-export { foo, bar, baz, boop, derp };
+export { foo, bar, baz, boop, derp, _$rwRuntime as __RewireAPI__ };

@@ -1,26 +1,26 @@
-import _rewireProxyRuntime from '/Users/itaylor/os/babel-plugin-rewire-exports/src/rewireProxyRuntime.js';
+import _rewireProxyRuntime from '/Users/itaylor/os/babel-plugin-rewire-exports/src/rewireProxyRuntime';
 
-const _$rwRuntime = _rewireProxyRuntime();
+const {
+  _$rwRuntime,
+  _$rwProx
+} = _rewireProxyRuntime();
 
-const _$rwProx = _$rwRuntime._add;
-export { _$rwRuntime as __RewireAPI__ };
+import { foo as foo_rewire } from "../../import/fakeLibrary";
 
-class Foob_rewire {
+let foo = _$rwProx(foo_rewire, "foo", () => foo, val => foo = val);
+
+let Foob = _$rwProx(class Foob {
   someMethod() {
     return 'cool';
   }
 
-}
+}, "Foob", () => Foob, val => Foob = val);
 
-let Foob = _$rwProx(Foob_rewire, "Foob", () => Foob, val => Foob = val);
-
-class Bar_rewire {
+let Bar = _$rwProx(class Bar {
   doThing() {
     return 0;
   }
 
-}
+}, "Bar", () => Bar, val => Bar = val);
 
-let Bar = _$rwProx(Bar_rewire, "Bar", () => Bar, val => Bar = val);
-
-export { Foob, Bar };
+export { Foob, Bar, _$rwRuntime as __RewireAPI__ };
