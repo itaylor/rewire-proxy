@@ -1,6 +1,9 @@
 import _rewireProxyRuntime from '/Users/itaylor/os/babel-plugin-rewire-exports/src/rewireProxyRuntime.js';
-export const __RewireAPI__ = _rewireProxyRuntime();
-const _$rwProx = __RewireAPI__.createProxyIfNeeded;
+
+const _$rwRuntime = _rewireProxyRuntime();
+
+const _$rwProx = _$rwRuntime._add;
+export { _$rwRuntime as __RewireAPI__ };
 const foo_rewire = 1;
 
 let foo = _$rwProx(foo_rewire, "foo", () => foo, val => foo = val);

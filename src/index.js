@@ -8,8 +8,9 @@ export default function ({types: t}) {
   // TODO: bundle as separate package
   const buildRewireObjects = template(`
     import _rewireProxyRuntime from '${__dirname}/rewireProxyRuntime.js'
-    export const __RewireAPI__ = _rewireProxyRuntime();
-    const _$rwProx = __RewireAPI__.createProxyIfNeeded;`);
+    const _$rwRuntime = _rewireProxyRuntime();
+    const _$rwProx = _$rwRuntime._add;
+    export { _$rwRuntime as __RewireAPI__ }`);
 
   const proxyTemplate = template(`
     let EXTERNALNAME = _$rwProx(INTERNALNAME, EXTERNALNAMESTR, () => EXTERNALNAME , (val) => EXTERNALNAME = val);`);
@@ -38,34 +39,38 @@ export default function ({types: t}) {
     name: 'rewire-proxies',
     visitor: {
       Program: {
-        enter(path, state) {
+        enter(_, state) {
           state.exports = [];
-          state.imports = [];
         },
-        exit(path, {exports, imports}) {
-          // if (!exports.length && !imports.length) return;
-
-          // de-duplicate the exports (do we really need this???)
-          const unique = exports.reduce((acc, e) => {
-            const key = e.external.name;
-            if (!acc[key]) {
-              acc[key] = e;
-            }
-            return acc;
-          }, {});
-          exports = Object.keys(unique).map(k => unique[k]);
-                   
-          path.pushContainer('body', markVisited(
-            t.exportNamedDeclaration(null, exports.map(e => t.exportSpecifier(e.local, e.external)))
-          ));
+        exit(path, {exports}) {
+          // // de-duplicate the exports (do we really need this???)
+          // const unique = exports.reduce((acc, e) => {
+          //   const key = e.external.name;
+          //   if (!acc[key]) {
+          //     acc[key] = e;
+          //   }
+          //   return acc;
+          // }, {});
+          // exports = Object.keys(unique).map(k => unique[k]);
+          
+          if (exports.length) {
+            path.pushContainer('body', markVisited(
+              t.exportNamedDeclaration(null, exports.map(e => {
+                return t.exportSpecifier(e.local, e.external)
+              }))
+            ));
+          }          
           path.unshiftContainer('body', buildRewireObjects({}).map(markVisited));
         }
       },
-      VariableDeclaration(path, { opts }) {
+      VariableDeclaration(path) {
         if (path.node[VISITED]) return;
         if (path?.scope?.block?.type === 'Program') {
-          // only modify top level variables
-          if (path?.node?.declarations[0]?.id?.name === '__RewireAPI__') return;
+          // only modify top level variables 
+          // don't modify "private" funcs prefixed with _ (babel adds some)
+          const name = path?.node?.declarations[0]?.id?.name;
+          if (name && name.startsWith('_')) return;
+          
           const newDecls = path.node.declarations.map((d) => {
             const cloned = t.cloneNode(d, true);
             const origName = cloned.id.name;
@@ -79,7 +84,7 @@ export default function ({types: t}) {
           });
         }
       },
-      ClassDeclaration(path, { opts }) {
+      ClassDeclaration(path) {
         if (path.node[VISITED]) return;
         if (path?.parent?.type === 'Program') {
           const cloned = t.cloneNode(path.node);
@@ -89,7 +94,7 @@ export default function ({types: t}) {
           path.insertAfter(markVisited(buildProxyTemplate(origName)));
         }
       },
-      FunctionDeclaration(path, { opts }) {
+      FunctionDeclaration(path) {
         if (path.node[VISITED]) return;
         if (path?.parent?.type === 'Program') {
           // only modify top level functions
@@ -100,6 +105,8 @@ export default function ({types: t}) {
           //  * make const var for proxy of original fn
           //  * make passthrough function decl with original name that calls to proxy
           const origId = path.node.id.name;
+          // don't modify "private" funcs prefixed with _ (babel adds some)
+          if (origId.startsWith('_')) return;
 
           const newFnExpression = t.cloneNode(path.node);
           newFnExpression.type = 'FunctionExpression'; //A functionExpression is just like a FunctionDeclaration, without a name.
@@ -115,7 +122,7 @@ export default function ({types: t}) {
           path.replaceWithMultiple(statements);
         }
       },      
-      ImportDeclaration(path, {imports, opts}) {
+      ImportDeclaration(path) {
         if (path.node[VISITED]) return;
         const specifiers = path.node.specifiers;
         for (const s of specifiers) {
@@ -127,13 +134,13 @@ export default function ({types: t}) {
             }
             const internalName = `${externalName}_rewire`;
             s.local.name = internalName;
-            path.insertAfter(buildProxyTemplate(externalName));
+            path.insertAfter(markVisited(buildProxyTemplate(externalName)));
           }
         }
         path.replaceWith(markVisited(t.ImportDeclaration(specifiers, path.node.source)));
       },
       // export default
-      ExportDefaultDeclaration(path, {exports, opts}) {
+      ExportDefaultDeclaration(path, {exports}) {
         if (path.node[VISITED]) return;
         
         const declaration = path.node.declaration;
@@ -146,17 +153,17 @@ export default function ({types: t}) {
           // export default class {
           // export default function {}
           declaration.id = path.scope.generateUidIdentifier('default');
-          exports.push({ local: declaration.id, externalName: defaultIdentifier });
+          exports.push({ local: declaration.id, external: defaultIdentifier });
           path.replaceWith(declaration);
         } else {
           // export default "somevalue"
           const id = path.scope.generateUidIdentifier('default');
           path.replaceWith(t.variableDeclaration('const', [t.variableDeclarator(id, declaration)]));
-          exports.push({ local: id, externalName: defaultIdentifier});
+          exports.push({ local: id, external: defaultIdentifier});
         }
       },
       // export {}
-      ExportNamedDeclaration(path, {exports, opts}) {
+      ExportNamedDeclaration(path, {exports}) {
         if (path.node[VISITED]) return;
         // export { foo } from './bar.js'
         if (path.node.source) return;

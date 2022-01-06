@@ -1,11 +1,8 @@
 
 export default function createRewireProxyRuntime() {
   const _rewireObjects = {};
-  return {
-    _add: (obj, name) => {
-      _rewireObjects[name] = obj;
-    },
-    rewireProxyIfNeeded: (obj, name, getterFn, setterFn) => {
+  const that = {
+    _add: (obj, name, getterFn, setterFn) => {
       const type = typeof obj;
       _rewireObjects[name] = { setterFn, getterFn };
       if (type === 'function' || type === 'object') {
@@ -31,10 +28,10 @@ export default function createRewireProxyRuntime() {
       }
       if (rw.proxyHandler) {
         if (typeof rw.original === 'function' && typeof val === 'function') {
-          this.rewireProxy(name, { apply: () => val() });
+          that.rewireProxy(name, { apply: () => val() });
         }
         if (typeof rw.original === 'object' && typeof val === 'object') {
-          this.rewireProxy(name, {
+          that.rewireProxy(name, {
             get: (target, prop, receiver) => {
               if (val[prop] !== undefined) {
                 return val[prop];
@@ -45,6 +42,7 @@ export default function createRewireProxyRuntime() {
         }
       } else {
         rw.preRewired = rw.getterFn();
+        rw.setterFn(val);
       }
     },
     __ResetDependency__: function (name) {
@@ -60,4 +58,5 @@ export default function createRewireProxyRuntime() {
       }
     }
   };
+  return that;
 }

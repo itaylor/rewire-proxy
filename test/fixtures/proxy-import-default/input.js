@@ -1,3 +1,3 @@
-import Somelib from 'some-non-existant-lib';
+import Somelib from 'some-non-existent-lib';
 
 Somelib.fooBar();
