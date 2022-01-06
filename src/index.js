@@ -7,7 +7,7 @@ export default function ({types: t}) {
 
   // TODO: bundle as separate package
   const buildRewireObjects = template(`
-    import _rewireProxyRuntime from '${__dirname}/rewireProxyRuntime.js'
+    import _rewireProxyRuntime from '@itaylor/babel-plugin-rewire-proxy/lib/rewireProxyRuntime.js'
     const _$rwRuntime = _rewireProxyRuntime();
     const _$rwProx = _$rwRuntime._add;
     export { _$rwRuntime as __RewireAPI__ }`);
