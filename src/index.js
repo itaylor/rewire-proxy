@@ -1,127 +1,37 @@
 import template from '@babel/template';
 
 export default function ({types: t}) {
-  const defaultIdentifier = t.identifier('default');
-  const rewireIdentifier = t.identifier('rewire');
-  const restoreIdentifier = t.identifier('restore');
-  const stubIdentifier = t.identifier('$stub');
   const VISITED = Symbol('visited');
 
-  const buildStub = template(`
-    export function REWIRE(STUB) {
-      LOCAL = STUB;
-    }
-  `, {sourceType: 'module'});
+  const defaultIdentifier = t.identifier('default');
 
-  const buildRestore = template(`
-    export function RESTORE() {
-      BODY
-    }
-  `, {sourceType: 'module'});
-
-  const buildRestoreImportTemplate = template(`
-    Object.keys(_rewireProxyHandlers).forEach(k1 => Object.keys(_rewireProxyHandlers[k1]).forEach(k2 =>  delete _rewireProxyHandlers[k1][k2]));
-  `);
-
-  const buildRestoreNonProxyTemplate = template(`
-    if (typeof INTERNALNAME !== 'object' && typeof INTERNALNAME !== 'function') {
-      EXTERNALNAME = INTERNALNAME;
-    }
-  `);
-
-  const buildRewireProxyHandlers = template(`
-    const _rewireObjects = {};
-  `);
-
-  const __RewireAPI__ = {
-    rewireProxyIfNeeded: (obj, name) => {
-      const type = typeof obj;
-      if (type === 'function' || type === 'object') {
-        const rwProx = {};
-        _rewireObjects[name] = {
-          proxyHandler: rwProx,
-          original: obj,
-        };
-        return new Proxy(obj, rwProx);
-      }
-      return obj;
-    },
-    rewireProxy: (name, proxyHandler) => {
-      const rw = _rewireObjects[name];
-      if (!rw || !rw.proxyHandler) {
-        throw new Error('Cannot rewire ' + name);
-      }
-      Object.keys(rw.proxyHandler).forEach(k => delete rw.proxyHandler[k]);
-      Object.keys(proxyHandler).forEach(k => rw.proxyHandler[k] = proxyHandler[k]);
-    },
-    __Rewire__: (name, val) => {
-      const rw = _rewireObjects[name];
-      if (!rw) {
-        throw new Error('Cannot rewire ' + name);
-      }
-      if (rw.proxyHandler) {
-        if (typeof rw.original === 'function' && typeof val === 'function') {
-          this.rewireProxy(name, { apply: () => val() });
-        }
-        if (typeof rw.original === 'object' && typeof val === 'object') {
-          this.rewireProxy(name, {
-            get: (target, prop, receiver) => {
-              if (val[prop] !== undefined) {
-                return val[prop];
-              }
-              return Reflect.get(target, prop, receiver);
-            }
-          });
-        }
-      } else {
-        rw.preRewired = rw.getterFn();
-      }
-    },
-    __ResetDependency__: function (name) {
-      const rw = _rewireObjects[name];
-      if (!rw) throw new Error('Cannot rewire ' + name);
-      if (rw.proxyHandler) {
-        Object.keys(rw.proxyHandler).forEach(k => delete rw.proxyHandler[k]);
-      } else if (rw.setterFn) {
-        if (rw.preRewired) {
-          rw.setterFn(rw.preRewired);
-          delete rw.preRewired;
-        }
-      }
-    }
-  };
+  // TODO: bundle as separate package
+  const buildRewireObjects = template(`
+    import _rewireProxyRuntime from '${__dirname}/rewireProxyRuntime.js'
+    export const __RewireAPI__ = _rewireProxyRuntime();
+    const _$rwProx = __RewireAPI__.createProxyIfNeeded;`);
 
   const proxyTemplate = template(`
-    let EXTERNALNAME = __RewireAPI__.rewireProxyIfNeeded(INTERNALNAME, EXTERNALNAMESTR);
-    _rewireObjects[EXTERNALNAMESTR] = {
-      setterFn: (val) => EXTERNALNAME = val;
-      getterFn: () => EXTERNALNAME;
-    };
-  `);
+    let EXTERNALNAME = _$rwProx(INTERNALNAME, EXTERNALNAMESTR, () => EXTERNALNAME , (val) => EXTERNALNAME = val);`);
 
+  const functionDeclProxyTemplate = template(`
+    const INTERNALNAME = FUNCDECL;
+    let PROXYNAME = _$rwProx(INTERNALNAME, EXTERNALNAMESTR, () => EXTERNALNAME );
+    function EXTERNALNAME(...args) {
+      return PROXYNAME(...args);
+    }`);
+  
   function buildProxyTemplate(externalName) {
     return proxyTemplate({
       EXTERNALNAME: t.identifier(externalName),
-      INTERNALNAME: t.identifier(`_${externalName}`),
+      INTERNALNAME: t.identifier(`${externalName}_rewire`),
       EXTERNALNAMESTR: t.stringLiteral(externalName),
     });
-  }
-
-  function buildNamedExport(local, exported) {
-    return markVisited(t.exportNamedDeclaration(null, [
-      t.exportSpecifier(t.identifier(local.name), t.identifier(exported.name))
-    ]));
   }
 
   function markVisited(node) {
     node[VISITED] = true;
     return node;
-  }
-
-  function captureVariableDeclarations(path) {
-    return Object.values(path.getOuterBindingIdentifiers(path)).map(([id]) => {
-      return {exported: t.cloneNode(id), local: id};
-    });
   }
 
   return {
@@ -133,91 +43,90 @@ export default function ({types: t}) {
           state.imports = [];
         },
         exit(path, {exports, imports}) {
-          if (!exports.length && !imports.length) return;
+          // if (!exports.length && !imports.length) return;
 
-          // de-duplicate the exports
+          // de-duplicate the exports (do we really need this???)
           const unique = exports.reduce((acc, e) => {
-            const key = e.exported.name;
+            const key = e.external.name;
             if (!acc[key]) {
               acc[key] = e;
             }
             return acc;
           }, {});
           exports = Object.keys(unique).map(k => unique[k]);
-
-          // generate temp variables if it's required to capture original values
-          const tempVars = [];
-          exports.filter(e => !e.original).forEach(e => {
-            const {exported, local} = e;
-            if (path.scope.hasBinding(exported.name) && exported.name !== local.name) {
-              e.original = exported;
-            } else {
-              const temp = e.original = path.scope.generateUidIdentifierBasedOnNode(exported);
-              tempVars.push(t.variableDeclarator(temp, local));
-            }
-          });
-
-          // generate new IDs to keep sourcemaps clean
-          const rewired = exports.map(({exported, local, original}) => ({
-            exported: t.identifier(exported.name),
-            local: t.identifier(local.name),
-            original: t.identifier(original.name)
-          }));
-
-          // generate stub functions
-          const hasConflictingBinding = path.scope.hasOwnBinding('rewire');
-          const stubs = rewired.map(({exported, local}) => {
-            let rewire = t.isIdentifier(exported, defaultIdentifier) && !hasConflictingBinding
-              ? rewireIdentifier : t.identifier(`rewire$${exported.name}`);
-            return markVisited(
-              buildStub({
-                REWIRE: rewire,
-                LOCAL: local,
-                STUB: stubIdentifier
-              })
-            );
-          });
-          // generate import proxy functions
-          imports.forEach((im) => {
-            stubs.push(markVisited(buildExportProxyTemplate(im.externalName)));
-          });
-
-          // generate restore function
-          const restore = path.scope.hasOwnBinding('restore') ? t.identifier('restore$rewire') : restoreIdentifier;
-          const assignments = rewired.map(({local, original}) => t.expressionStatement(t.assignmentExpression('=', local, original)));
-          assignments.push(buildRestoreImportTemplate());
-        
-          imports.forEach((im) => {
-            assignments.push(buildRestoreNonProxyTemplate({ INTERNALNAME: t.identifier(im.internalName), EXTERNALNAME: t.identifier(im.externalName) }));
-          });
-
-          const body = [
-            ...stubs,
-            markVisited(buildRestore({RESTORE: restore, BODY: assignments})),
-            ...[...makeRewireProxySetup({})].map(markVisited)
-          ];
-
-          if (tempVars.length) {
-            body.unshift(t.variableDeclaration('var', tempVars));
-          }
-          const pt = buildRewireProxyHandlers({});
-          path.unshiftContainer('body', pt);
-          path.pushContainer('body', body);
+                   
+          path.pushContainer('body', markVisited(
+            t.exportNamedDeclaration(null, exports.map(e => t.exportSpecifier(e.local, e.external)))
+          ));
+          path.unshiftContainer('body', buildRewireObjects({}).map(markVisited));
         }
       },
+      VariableDeclaration(path, { opts }) {
+        if (path.node[VISITED]) return;
+        if (path?.scope?.block?.type === 'Program') {
+          // only modify top level variables
+          if (path?.node?.declarations[0]?.id?.name === '__RewireAPI__') return;
+          const newDecls = path.node.declarations.map((d) => {
+            const cloned = t.cloneNode(d, true);
+            const origName = cloned.id.name;
+            cloned.id.name = `${origName}_rewire`;
+            return { origName, newName: cloned.id.name, node:cloned };
+          })
+          path.replaceWith(t.variableDeclaration('const', newDecls.map(nd => nd.node)));
+          markVisited(path.node);
+          newDecls.reverse().forEach(({ origName }) => {
+            path.insertAfter(markVisited(buildProxyTemplate(origName)));
+          });
+        }
+      },
+      ClassDeclaration(path, { opts }) {
+        if (path.node[VISITED]) return;
+        if (path?.parent?.type === 'Program') {
+          const cloned = t.cloneNode(path.node);
+          const origName = cloned.id.name;
+          cloned.id.name = `${origName}_rewire`;
+          path.replaceWith(markVisited(cloned));
+          path.insertAfter(markVisited(buildProxyTemplate(origName)));
+        }
+      },
+      FunctionDeclaration(path, { opts }) {
+        if (path.node[VISITED]) return;
+        if (path?.parent?.type === 'Program') {
+          // only modify top level functions
+
+          // in order to preserve function hoisting behavior
+          // we need to convert in the following way:
+          //  * rename original function decl
+          //  * make const var for proxy of original fn
+          //  * make passthrough function decl with original name that calls to proxy
+          const origId = path.node.id.name;
+
+          const newFnExpression = t.cloneNode(path.node);
+          newFnExpression.type = 'FunctionExpression'; //A functionExpression is just like a FunctionDeclaration, without a name.
+          delete newFnExpression.id;
+          const statements = functionDeclProxyTemplate({
+            PROXYNAME: t.identifier(`${origId}_proxy_rewire`),
+            FUNCDECL: newFnExpression,
+            INTERNALNAME: t.identifier(`${origId}_rewire`),
+            EXTERNALNAME: t.identifier(origId),
+            EXTERNALNAMESTR: t.stringLiteral(origId),
+          });
+          statements.forEach(markVisited);
+          path.replaceWithMultiple(statements);
+        }
+      },      
       ImportDeclaration(path, {imports, opts}) {
         if (path.node[VISITED]) return;
         const specifiers = path.node.specifiers;
         for (const s of specifiers) {
           if (s.type === 'ImportDefaultSpecifier' || s.type === 'ImportSpecifier' || s.type === 'ImportNamespaceSpecifier' ) {
             const externalName = s.local.name;
-            if (externalName.startsWith('rewire$')) {
+            if (externalName.endsWith('_rewire')) {
               //don't mess with imports of rewire functions
               continue;
             }
-            const internalName = `_${externalName}`;
+            const internalName = `${externalName}_rewire`;
             s.local.name = internalName;
-            imports.push({ externalName, internalName });
             path.insertAfter(buildProxyTemplate(externalName));
           }
         }
@@ -225,50 +134,25 @@ export default function ({types: t}) {
       },
       // export default
       ExportDefaultDeclaration(path, {exports, opts}) {
+        if (path.node[VISITED]) return;
+        
         const declaration = path.node.declaration;
         const isIdentifier = t.isIdentifier(declaration);
         const binding = isIdentifier && path.scope.getBinding(declaration.name);
-        if (opts.unsafeConst && binding && binding.kind === 'const') {
-          // allow to rewire constants
-          binding.kind = 'let';
-          binding.path.parent.kind = 'let';
-        }
-        const isImmutable = !binding || ['const', 'module'].includes(binding.kind);
-        if (isIdentifier && !isImmutable) {
+        if (isIdentifier && binding) {
           // export default foo
-          exports.push({exported: defaultIdentifier, local: declaration});
-          path.replaceWith(buildNamedExport(declaration, defaultIdentifier));
-        } else if (t.isFunctionDeclaration(declaration)) {
-          //export default function () {}
-          const id = declaration.id || path.scope.generateUidIdentifier('default');
-          exports.push({exported: defaultIdentifier, local: id});
-          path.replaceWith(buildNamedExport(id, defaultIdentifier));
-          path.scope.removeBinding(id.name);
-          path.scope.push({
-            id,
-            init: t.functionExpression(declaration.id, declaration.params, declaration.body, declaration.generator, declaration.async),
-            unique: true
-          });
-        } else if (t.isClassDeclaration(declaration)) {
-          //export default class {}
-          const id = declaration.id || path.scope.generateUidIdentifier('default');
-          exports.push({exported: defaultIdentifier, local: id});
-          const [varDeclaration] = path.replaceWithMultiple([
-            t.variableDeclaration('var', [
-              t.variableDeclarator(id, t.classExpression(declaration.id, declaration.superClass, declaration.body, declaration.decorators || []))
-            ]),
-            buildNamedExport(id, defaultIdentifier)
-          ]);
-          path.scope.registerDeclaration(varDeclaration);
+          exports.push({ local: declaration.id, external: defaultIdentifier });
+        } else if(t.isFunctionDeclaration(declaration) || t.isClassDeclaration(declaration)) {
+          // export default class {
+          // export default function {}
+          declaration.id = path.scope.generateUidIdentifier('default');
+          exports.push({ local: declaration.id, externalName: defaultIdentifier });
+          path.replaceWith(declaration);
         } else {
-          // export default ...
+          // export default "somevalue"
           const id = path.scope.generateUidIdentifier('default');
-          exports.push({exported: defaultIdentifier, local: id});
-          const [varDeclaration] = path.replaceWithMultiple([
-            t.variableDeclaration('var', [t.variableDeclarator(id, declaration)]),
-            buildNamedExport(id, defaultIdentifier)
-          ]);
-          path.scope.registerDeclaration(varDeclaration);
+          path.replaceWith(t.variableDeclaration('const', [t.variableDeclarator(id, declaration)]));
+          exports.push({ local: id, externalName: defaultIdentifier});
         }
       },
       // export {}
@@ -279,70 +163,30 @@ export default function ({types: t}) {
 
         const declaration = path.node.declaration;
         if (t.isVariableDeclaration(declaration)) {
-          // export const foo = 'bar'
-          if (declaration.kind === 'const') {
-            if (opts.unsafeConst) {
-              declaration.kind = 'let'; // convert const to let
-            } else {
-              // convert export variable declaration to export specifier
-              // export const foo = 'bar'; → const foo = 'bar'; export { foo };
-              const identifiers = captureVariableDeclarations(path);
-              const [varDeclaration] = path.replaceWithMultiple([
-                declaration,
-                t.exportNamedDeclaration(null, identifiers.map(({exported, local}) =>
-                  t.exportSpecifier(t.identifier(local.name), t.identifier(exported.name))
-                ))
-              ]);
-              path.scope.registerDeclaration(varDeclaration);
-              return; // visitor will handle the added export specifier later
-            }
-          }
-          exports.push(...captureVariableDeclarations(path));
-        } else if (t.isFunctionDeclaration(declaration)) {
-          // export function foo() {}
-          const id = declaration.id;
-          exports.push({exported: t.cloneNode(id), local: id});
-          path.replaceWith(buildNamedExport(id, id));
-          path.scope.removeBinding(id.name);
-          path.scope.push({
-            id,
-            init: t.functionExpression(declaration.id, declaration.params, declaration.body, declaration.generator, declaration.async),
-            unique: true
+          // export const foo = bar, biff = baz;
+          const newDeclarations = [];
+          path.node.declaration.declarations.forEach((d) => {
+            newDeclarations.push(t.variableDeclaration(path.node.declaration.kind, [d]));
+            exports.push({ local: d.id, external: d.id });
           });
-        } else if (t.isClassDeclaration(declaration)) {
-          // export class Foo {}
-          const id = declaration.id;
-          exports.push({exported: t.cloneNode(id), local: id});
-          const [varDeclaration] = path.replaceWithMultiple([
-            t.variableDeclaration('var', [
-              t.variableDeclarator(id, t.classExpression(id, declaration.superClass, declaration.body, declaration.decorators || []))
-            ]),
-            buildNamedExport(id, id)
+          path.replaceWithMultiple([
+            ...newDeclarations,
           ]);
-          path.scope.registerDeclaration(varDeclaration);
+        } else if (t.isFunctionDeclaration(declaration) || t.isClassDeclaration(declaration)) {
+          // export class foo {
+          // export function foo() {}
+          const id = path.node.declaration.id;
+          path.replaceWithMultiple([
+            declaration,
+          ]);
+          exports.push({ local: id, external: id });
         } else {
           // export {foo}
-          path.node.specifiers.forEach(node => {
-            const {exported, local} = node;
-            const binding = path.scope.getBinding(local.name);
-            if (!binding) return;
-            if (opts.unsafeConst && binding.kind === 'const') {
-              // allow to rewire constants
-              binding.kind = 'let';
-              binding.path.parent.kind = 'let';
-            } else if (['const', 'module'].includes(binding.kind)) {
-              // const and imports
-              const id = path.scope.generateUidIdentifier(local.name);
-              exports.push({exported, local: id});
-              const [varDeclaration] = path.insertBefore(t.variableDeclaration('var', [t.variableDeclarator(id, local)]));
-              path.scope.registerDeclaration(varDeclaration);
-              node.local = id;
-              return;
-            }
-            exports.push({exported, local});
-          });
+          // move the named exports to the end of the file
+          path.node.specifiers.forEach((s) => exports.push({ local: s.local, external: s.exported }));
+          path.remove();
         }
-      }
+     }
     }
   };
 }
