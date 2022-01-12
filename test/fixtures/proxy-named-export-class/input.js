@@ -6,6 +6,8 @@ export class Foob {
   }
 }
 
+Foob.staticProp = { nice: 'test' };
+
 class Bar {
   doThing() {
     return 0;
