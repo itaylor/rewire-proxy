@@ -1,6 +1,7 @@
 const proxyMap = new WeakMap();
 const proxyHandlerMap = new WeakMap();
 const proxySet = new WeakSet();
+const nestedClassSymbol = Symbol('nestedClass');
 
 export default function createRewireProxyRuntime() {
   const _rewireObjects = {};
@@ -69,7 +70,22 @@ export default function createRewireProxyRuntime() {
       let needsSetWithSetter = true;
       if (rw.proxy) {
         if (typeof val === 'function') {
-          that.rewireProxy(name, { apply: (target, thisArg, args) => val(...args) });
+          that.rewireProxy(name, { 
+            apply: (target, thisArg, args) => val(...args), 
+            construct: (target, args) => {
+              if (val[nestedClassSymbol]) {
+                delete val[nestedClassSymbol];
+                return Reflect.construct(target, args);
+              }
+              val[nestedClassSymbol] = true;
+              try {
+                const result = new val(...args);
+                return result;
+              } finally {
+                delete val[nestedClassSymbol];
+              }
+            }
+          });
           needsSetWithSetter = false;
         }
         if (typeof val === 'object') {

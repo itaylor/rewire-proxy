@@ -15,17 +15,15 @@ export default function ({types: t}) {
     const { _$rwRuntime, _$rwProx } = _rewireProxyRuntime();
   `);
   
-  const proxyTemplate = template(`
-    let EXTERNALNAME = _$rwProx(DECL, EXTERNALNAMESTR, () => EXTERNALNAME , (val) => EXTERNALNAME = val);`);
+  // Abuses var decl to allow to overwrite the a function with its own proxy without actually renaming the function
+  const proxyFunctionTemplate = template(`
+    var INTERNALNAME = EXTERNALNAME;
+    var EXTERNALNAME = _$rwProx(INTERNALNAME, EXTERNALNAMESTR, () => EXTERNALNAME, (val) => EXTERNALNAME = val);
+  `)
 
-  const functionDeclProxyTemplate = template(`
-    function EXTERNALNAME(...args) {
-      if (!EXTERNALNAME._rewire) {
-        EXTERNALNAME._rewire = _$rwProx(FUNCDECL, EXTERNALNAMESTR, () => EXTERNALNAME);
-      }
-      return EXTERNALNAME._rewire(...args);
-    }`);
-  
+  const proxyTemplate = template(`
+    var EXTERNALNAME = _$rwProx(DECL, EXTERNALNAMESTR, () => EXTERNALNAME , (val) => EXTERNALNAME = val);`);
+
   const defaultExportTemplate = template(`
     export default IDENT;
   `)
@@ -68,8 +66,9 @@ export default function ({types: t}) {
       Program: {
         enter(_, state) {
           state.exports = [];
+          state.hoistedFunctions = [];
         },
-        exit(path, {exports}) {
+        exit(path, {exports, hoistedFunctions} ) {
           exports.push({ local: t.identifier('_$rwRuntime'), external: t.identifier('__RewireAPI__') });
           let defaultExport = null;
           let otherExportSpecifiers = [];
@@ -89,7 +88,16 @@ export default function ({types: t}) {
           }
           path.pushContainer('body', exportDecls);
           const varDecl = markVisited(buildRewireVarDecl());
-          path.unshiftContainer('body', [varDecl, markVisited(buildRewireObjects({}))]);
+          
+          const hoisted = [];
+          hoistedFunctions.forEach((h) => {
+            proxyFunctionTemplate({ 
+              EXTERNALNAME: t.identifier(h.origId),
+              INTERNALNAME: t.identifier(h.newId),
+              EXTERNALNAMESTR: t.stringLiteral(h.origId),
+            }).forEach((n) => hoisted.push(markVisited(n)));
+          });
+          path.unshiftContainer('body', [varDecl, ...hoisted, markVisited(buildRewireObjects({}))]);
         }
       },
       VariableDeclaration(path) {
@@ -130,28 +138,16 @@ export default function ({types: t}) {
           path.replaceWith(markVisited(buildProxyTemplate(path.node.id.name, path.node)));
         }
       },
-      FunctionDeclaration(path) {
+      FunctionDeclaration(path, { hoistedFunctions }) {
         if (path.node[VISITED]) return;
         if (path?.parent?.type === 'Program') {
           // only modify top level functions
 
-          // in order to preserve function hoisting behavior
-          // we need to convert in the following way:
-          //  * rename original function decl
-          //  * make const var for proxy of original fn
-          //  * make passthrough function decl with original name that calls to proxy
           const origId = path.node.id.name;
           // don't modify "private" funcs prefixed with _ (babel adds some)
           if (origId.startsWith('_')) return;
-
-          const newFnExpression = t.cloneNode(path.node);
-          newFnExpression.type = 'FunctionExpression'; //A functionExpression is just like a FunctionDeclaration.
-          const statements = functionDeclProxyTemplate({
-            FUNCDECL: newFnExpression,
-            EXTERNALNAME: t.identifier(origId),
-            EXTERNALNAMESTR: t.stringLiteral(origId),
-          });
-          path.replaceWithMultiple(markAllVisited(statements));
+          const newId = path.scope.generateUidIdentifier(origId);
+          hoistedFunctions.push({ origId, newId: newId.name });
         }
       },      
       ImportDeclaration(path) {

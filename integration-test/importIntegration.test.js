@@ -1,5 +1,6 @@
 import assert from 'assert';
 import { doAllTheThings, biffIt, __RewireAPI__ } from './fixtures/import/usesFakeLibrary.js';
+import { FakeClass, __RewireAPI__ as FakeClassRewire } from './fixtures/import/FakeClass.js';
 
 describe('Mock imports', () => {
   it('should allow to override imports of rewired module', () => {
@@ -42,5 +43,49 @@ describe('Mock imports', () => {
     assert.strictEqual(biffIt(), 420);
     restore('biff');
     assert.strictEqual(biffIt(), 7);
+  });
+
+  it('should allow to mock a class constructor', () => {
+    const rewire = FakeClassRewire.__Rewire__;
+    const restore = FakeClassRewire.__ResetDependency__;
+
+    const fc = new FakeClass();
+    assert.strictEqual(fc.doesSomethingLame(), false);
+    rewire('FakeClass', (class OverridesFakeClass {
+      constructor () {
+        this.awesome = true;
+      }
+      doesSomethingLame() {
+        return 'lame';
+      }
+    }));
+    const fc2 = new FakeClass();
+    assert.strictEqual(fc2.doesSomethingLame(), 'lame');
+    const fc3 = new FakeClass();
+    assert.strictEqual(fc3.doesSomethingLame(), 'lame');
+    restore('FakeClass');
+    const fc4 = new FakeClass();
+    assert.strictEqual(fc4.doesSomethingLame(), false);
+  });
+
+  it('should allow to mock a class constructor with super', () => {
+    const rewire = FakeClassRewire.__Rewire__;
+    const restore = FakeClassRewire.__ResetDependency__;
+
+    const fc = new FakeClass();
+    assert.strictEqual(fc.doesSomethingLame(), false);
+    rewire('FakeClass', (class OverridesFakeClass extends FakeClass {
+      constructor() {
+        super();
+        this.awesome = true;
+      }
+    }));
+    const fc2 = new FakeClass();
+    assert.strictEqual(fc2.doesSomethingLame(), true);
+    const fc3 = new FakeClass();
+    assert.strictEqual(fc3.doesSomethingLame(), true);
+    restore('FakeClass');
+    const fc4 = new FakeClass();
+    assert.strictEqual(fc4.doesSomethingLame(), false);
   });
 });
