@@ -1,7 +1,7 @@
 const proxyMap = new WeakMap();
 const proxyHandlerMap = new WeakMap();
 const proxySet = new WeakSet();
-const nestedClassSymbol = Symbol('nestedClass');
+const recursionMarker = Symbol('recursionMarker');
 
 export default function createRewireProxyRuntime() {
   const _rewireObjects = {};
@@ -71,18 +71,30 @@ export default function createRewireProxyRuntime() {
       if (rw.proxy) {
         if (typeof val === 'function') {
           that.rewireProxy(name, { 
-            apply: (target, thisArg, args) => val(...args), 
+            apply: (target, thisArg, args) => {
+              if (val[recursionMarker]) {
+                delete val[recursionMarker];
+                return Reflect.apply(target, thisArg, args); 
+              } else {
+                val[recursionMarker] = true;
+                try {
+                  return val(...args);
+                } finally {
+                  delete val[recursionMarker];
+                }                
+              }
+            },
             construct: (target, args) => {
-              if (val[nestedClassSymbol]) {
-                delete val[nestedClassSymbol];
+              if (val[recursionMarker]) {
+                delete val[recursionMarker];
                 return Reflect.construct(target, args);
               }
-              val[nestedClassSymbol] = true;
+              val[recursionMarker] = true;
               try {
                 const result = new val(...args);
                 return result;
               } finally {
-                delete val[nestedClassSymbol];
+                delete val[recursionMarker];
               }
             }
           });

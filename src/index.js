@@ -15,37 +15,46 @@ export default function ({types: t}) {
     const { _$rwRuntime, _$rwProx } = _rewireProxyRuntime();
   `);
   
-  // Abuses var decl to allow to overwrite the a function with its own proxy without actually renaming the function
+  // Abuses var decl to allow to overwrite a var with its own proxy without actually renaming the function
   const proxyFunctionTemplate = template(`
     var INTERNALNAME = EXTERNALNAME;
     var EXTERNALNAME = _$rwProx(INTERNALNAME, EXTERNALNAMESTR, () => EXTERNALNAME, (val) => EXTERNALNAME = val);
-  `)
+  `);
+
+  const proxyImportTemplate = template(`
+    var EXTERNALNAME = _$rwProx(INTERNALNAME, EXTERNALNAMESTR, () => EXTERNALNAME, (val) => EXTERNALNAME = val);
+  `);
+
 
   const proxyTemplate = template(`
-    var EXTERNALNAME = _$rwProx(DECL, EXTERNALNAMESTR, () => EXTERNALNAME , (val) => EXTERNALNAME = val);`);
+    var INTERNALNAME = EXTERNALNAME;
+    EXTERNALNAME = _$rwProx(INTERNALNAME, EXTERNALNAMESTR, () => EXTERNALNAME, (val) => EXTERNALNAME = val);
+  `);
 
   const defaultExportTemplate = template(`
     export default IDENT;
-  `)
-  
-
-  // Wrap arrow function in an IIFE that preserves the function.name of the DECL of the function
-  // This is needed for React Components that use the function.name to name the Component.
-  const arrowFunctionProxyTemplate = template(`
-    (() => { const EXTERNALNAME = DECL; return EXTERNALNAME; } )()
   `);
 
-  function buildArrowFnProxyTemplate(externalName, decl) {
-    const arrowFuncIIFE = arrowFunctionProxyTemplate({ DECL: decl, EXTERNALNAME: t.identifier(externalName) });
-    return buildProxyTemplate(externalName, arrowFuncIIFE.expression);
-  }
+  // function buildProxyFunctionTemplate(externalName, internalName) {
+  //   return proxyFunctionTemplate({
+  //     EXTERNALNAME: externalName,
+  //     INTERNALNAME: internalName,
+  //     EXTERNALNAMESTR: t.stringLiteral(externalName.name),
+  //   });
+  // }
 
-  function buildProxyTemplate(externalName, decl) {
+  function buildProxyImportTemplate(externalName, internalName) {
+    return proxyImportTemplate({
+      EXTERNALNAME: externalName,
+      INTERNALNAME: internalName,
+      EXTERNALNAMESTR: t.stringLiteral(externalName.name),
+    });
+  }
+  function buildProxyTemplate(externalName, internalName) {
     return proxyTemplate({
-      DECL: decl,
-      EXTERNALNAME: t.identifier(externalName),
-     // INTERNALNAME: t.identifier(`${externalName}_rewire`),
-      EXTERNALNAMESTR: t.stringLiteral(externalName),
+      EXTERNALNAME: externalName,
+      INTERNALNAME: internalName,
+      EXTERNALNAMESTR: t.stringLiteral(externalName.name),
     });
   }
 
@@ -73,7 +82,7 @@ export default function ({types: t}) {
           let defaultExport = null;
           let otherExportSpecifiers = [];
           exports.forEach((e) => {
-            if (e?.external?.name === 'default') {
+            if (e.external.name === 'default') {
               defaultExport = defaultExportTemplate({ IDENT: e.local });
             } else {
               otherExportSpecifiers.push(t.exportSpecifier(e.local, e.external));
@@ -121,21 +130,24 @@ export default function ({types: t}) {
             markVisited(path.node);
             return;
           }
+          
           const decls = path.node.declarations;
-          path.replaceWithMultiple(decls.map((d) =>  {
-            if (d?.init?.type === 'ArrowFunctionExpression') {
-              return markVisited(buildArrowFnProxyTemplate(d.id.name, d.init));
-            }
-            return markVisited(buildProxyTemplate(d.id.name, d.init));
-          }));
+          const replacements = [];
+          decls.forEach((d) => {
+            markAllVisited(buildProxyTemplate(d.id, path.scope.generateUidIdentifier(d.id.name))).forEach((n) => replacements.push(n));
+          });
+          path.node.kind = 'var';
+          path.insertAfter(replacements);
         }
       },
       ClassDeclaration(path) {
         if (path.node[VISITED]) return;
         if (path?.parent?.type === 'Program') {
           // convert ClassDecl to ClassExpression
-          path.node.type = 'ClassExpression';
-          path.replaceWith(markVisited(buildProxyTemplate(path.node.id.name, path.node)));
+          // path.node.type = 'ClassExpression';
+          const name = path.node.id.name;
+          const internalName = path.scope.generateUidIdentifier(name);
+          path.insertAfter(markAllVisited(buildProxyTemplate(path.node.id, internalName)));
         }
       },
       FunctionDeclaration(path, { hoistedFunctions }) {
@@ -162,7 +174,7 @@ export default function ({types: t}) {
             }
             const internalName = `${externalName}_rewire`;
             s.local.name = internalName;
-            path.insertAfter(markVisited(buildProxyTemplate(externalName, t.identifier(internalName))));
+            path.insertAfter(markVisited(buildProxyImportTemplate(t.identifier(externalName), t.identifier(internalName))));
           }
         }
         path.replaceWith(markVisited(t.ImportDeclaration(specifiers, path.node.source)));
