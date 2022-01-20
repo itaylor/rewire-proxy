@@ -1,4 +1,4 @@
-import _rewireProxyRuntime from '/Users/itaylor/os/babel-plugin-rewire-exports/src/rewireProxyRuntime';
+import _rewireProxyRuntime from '@itaylor/rewire-proxy-runtime';
 
 const {
   _$rwRuntime,

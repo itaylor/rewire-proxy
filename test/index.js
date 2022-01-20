@@ -3,7 +3,7 @@ import fs from 'fs';
 import assert from 'assert';
 import { transformFileSync } from '@babel/core';
 import { trim } from './util';
-import plugin from '../src';
+import plugin from '../packages/babel-plugin-rewire-proxy/lib/index.js';
 
 describe('Plugin', () => {
   const fixturesDir = path.join(__dirname, 'fixtures');
@@ -12,7 +12,6 @@ describe('Plugin', () => {
     plugins: [plugin]
   };
   fs.readdirSync(fixturesDir).map((caseName) => {
-//    if (!caseName.startsWith('proxy')) return;
     const fixtureDir = path.join(fixturesDir, caseName);
     const inputPath = path.join(fixtureDir, 'input.js');
 

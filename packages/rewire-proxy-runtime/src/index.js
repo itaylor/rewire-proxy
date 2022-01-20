@@ -70,18 +70,18 @@ export default function createRewireProxyRuntime() {
       let needsSetWithSetter = true;
       if (rw.proxy) {
         if (typeof val === 'function') {
-          that.rewireProxy(name, { 
+          that.rewireProxy(name, {
             apply: (target, thisArg, args) => {
               if (val[recursionMarker]) {
                 delete val[recursionMarker];
-                return Reflect.apply(target, thisArg, args); 
+                return Reflect.apply(target, thisArg, args);
               } else {
                 val[recursionMarker] = true;
                 try {
                   return val(...args);
                 } finally {
                   delete val[recursionMarker];
-                }                
+                }
               }
             },
             construct: (target, args) => {

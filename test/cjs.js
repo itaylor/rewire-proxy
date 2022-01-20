@@ -1,30 +1,30 @@
-import fs from 'fs';
-import assert from 'assert';
-import { transformFileSync } from '@babel/core';
-import { trim } from './util';
-import plugin from '../src';
+// import fs from 'fs';
+// import assert from 'assert';
+// import { transformFileSync } from '@babel/core';
+// import { trim } from './util';
+// import plugin from '../packages/babel-plugin-rewire-proxy/lib/index.js';
 
-describe.skip('cjs modules should work', () => {
-  it('when plugin is first', () => {
-    const options = {
-      babelrc: false,
-      plugins: [plugin, '@babel/plugin-transform-modules-commonjs']
-    };
+// describe.skip('cjs modules should work', () => {
+//   it('when plugin is first', () => {
+//     const options = {
+//       babelrc: false,
+//       plugins: [plugin, '@babel/plugin-transform-modules-commonjs']
+//     };
 
-    const actual = transformFileSync('./test/cjs/input.js', options).code;
-    const expected = fs.readFileSync('./test/cjs/output.js').toString();
+//     const actual = transformFileSync('./test/cjs/input.js', options).code;
+//     const expected = fs.readFileSync('./test/cjs/output.js').toString();
 
-    assert.strictEqual(trim(actual), trim(expected));
-  });
+//     assert.strictEqual(trim(actual), trim(expected));
+//   });
 
-  it('when using env preset', () => {
-    const options = {
-      plugins: [plugin]
-    };
+//   it('when using env preset', () => {
+//     const options = {
+//       plugins: [plugin]
+//     };
 
-    const actual = transformFileSync('./test/cjs/input.js', options).code;
-    const expected = fs.readFileSync('./test/cjs/output.js').toString();
+//     const actual = transformFileSync('./test/cjs/input.js', options).code;
+//     const expected = fs.readFileSync('./test/cjs/output.js').toString();
 
-    assert.strictEqual(trim(actual), trim(expected));
-  });
-});
+//     assert.strictEqual(trim(actual), trim(expected));
+//   });
+// });

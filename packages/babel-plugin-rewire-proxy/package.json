@@ -1,0 +1,46 @@
+{
+  "name": "@itaylor/babel-plugin-rewire-proxy",
+  "version": "0.0.7",
+  "description": "Babel plugin that enables rewiring of code for mocking/testing purposes",
+  "main": "lib/index.js",
+  "scripts": {
+    "clean": "rimraf lib",
+    "build": "babel src -d lib",
+    "lint": "eslint src",
+    "prepack": "yarn run clean && yarn run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/itaylor/rewire-proxy.git"
+  },
+  "keywords": [
+    "babel",
+    "plugin",
+    "rewire",
+    "proxy",
+    "mocking"
+  ],
+  "author": "ian.b.taylor@gmail.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/itaylor/rewire-proxy/issues"
+  },
+  "homepage": "https://github.com/itaylor/rewire-proxy/issues#readme",
+  "dependencies": {
+    "@babel/template": "7"
+  },
+  "peerDependencies": {
+    "@itaylor/rewire-proxy-runtime": "0.0.7"
+  },
+  "devDependencies": {
+    "@babel/cli": "7",
+    "@babel/core": "7",
+    "@babel/preset-env": "7",
+    "@babel/preset-react": "7",
+    "@babel/preset-typescript": "7",
+    "@babel/register": "7",
+    "eslint": "7",
+    "mocha": "8",
+    "rimraf": "3"
+  }
+}

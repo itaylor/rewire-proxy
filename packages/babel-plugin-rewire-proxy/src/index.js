@@ -7,7 +7,7 @@ export default function ({types: t}) {
 
   const buildRewireObjects = template(`
  //   import _rewireProxyRuntime from '${__dirname}/rewireProxyRuntime';
-    import _rewireProxyRuntime from '@itaylor/babel-plugin-rewire-proxy/lib/rewireProxyRuntime.js';
+    import _rewireProxyRuntime from '@itaylor/rewire-proxy-runtime';
   `);
 
   const buildRewireVarDecl = template(`
