@@ -5,9 +5,13 @@ const {
   _$rwProx
 } = _rewireProxyRuntime();
 
-import { someObj as someObj_rewire } from 'some-non-existent-lib';
+class _default {
+  constructor() {
+    this.foo = 'bar';
+  }
 
-var someObj = _$rwProx(someObj_rewire, "someObj", () => someObj, val => someObj = val);
+}
 
-someObj.fooBar();
+_default = _$rwProx(_default, "_default", () => _default, val => _default = val);
+export default _default;
 export { _$rwRuntime as __RewireAPI__ };

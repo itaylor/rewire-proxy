@@ -1,17 +1,14 @@
-import { foo } from './bar.js';
+import _rewireProxyRuntime from '/Users/itaylor/os/babel-plugin-rewire-exports/src/rewireProxyRuntime';
+
+const {
+  _$rwRuntime,
+  _$rwProx
+} = _rewireProxyRuntime();
+
+import { foo as foo_rewire } from './bar.js';
+
+var foo = _$rwProx(foo_rewire, "foo", () => foo, val => foo = val);
+
 foo.baz = 'qux';
-var _foo = foo;
-export { _foo as foo };
-var _default = foo;
-export { _default as default };
-var _default2 = _default;
-export function rewire$foo($stub) {
-  _foo = $stub;
-}
-export function rewire($stub) {
-  _default = $stub;
-}
-export function restore() {
-  _foo = foo;
-  _default = _default2;
-}
+export default foo;
+export { foo, _$rwRuntime as __RewireAPI__ };

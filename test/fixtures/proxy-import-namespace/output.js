@@ -5,9 +5,9 @@ const {
   _$rwProx
 } = _rewireProxyRuntime();
 
-import { someObj as someObj_rewire } from 'some-non-existent-lib';
+import * as biff_rewire from 'some-non-existent-lib';
 
-var someObj = _$rwProx(someObj_rewire, "someObj", () => someObj, val => someObj = val);
+var biff = _$rwProx(biff_rewire, "biff", () => biff, val => biff = val);
 
-someObj.fooBar();
+biff.something();
 export { _$rwRuntime as __RewireAPI__ };

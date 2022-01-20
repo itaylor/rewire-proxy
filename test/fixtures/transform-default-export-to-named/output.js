@@ -1,9 +1,10 @@
+import _rewireProxyRuntime from '/Users/itaylor/os/babel-plugin-rewire-exports/src/rewireProxyRuntime';
+
+const {
+  _$rwRuntime,
+  _$rwProx
+} = _rewireProxyRuntime();
+
 var foo;
-export { foo as default };
-var _default = foo;
-export function rewire($stub) {
-  foo = $stub;
-}
-export function restore() {
-  foo = _default;
-}
+export default foo;
+export { _$rwRuntime as __RewireAPI__ };

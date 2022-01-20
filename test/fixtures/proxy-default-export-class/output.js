@@ -5,9 +5,16 @@ const {
   _$rwProx
 } = _rewireProxyRuntime();
 
-import { someObj as someObj_rewire } from 'some-non-existent-lib';
+class Foob {
+  someMethod() {
+    return 'cool';
+  }
 
-var someObj = _$rwProx(someObj_rewire, "someObj", () => someObj, val => someObj = val);
+}
 
-someObj.fooBar();
+Foob = _$rwProx(Foob, "Foob", () => Foob, val => Foob = val);
+Foob.staticProp = {
+  nice: 'test'
+};
+export default Foob;
 export { _$rwRuntime as __RewireAPI__ };

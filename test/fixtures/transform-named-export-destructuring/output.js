@@ -1,84 +1,56 @@
-export var {
-  foo = false,
-  bar: baz,
-  ...rest
-} = qux;
-export var [ham = 1, ...eggs] = bacon;
+import _rewireProxyRuntime from '/Users/itaylor/os/babel-plugin-rewire-exports/src/rewireProxyRuntime';
+
 const {
+  _$rwRuntime,
+  _$rwProx
+} = _rewireProxyRuntime();
+
+// object pattern
+var {
+  funn,
   quux = false,
   quuy: quuz,
   ...other
-} = fred;
-var _quuz = quuz;
-var _other = other;
-var _quux = quux;
-export { _quuz as quuz, _other as other, _quux as quux };
-const [corge = 1, ...grault] = garply;
-var _corge = corge;
-var _grault = grault;
-export { _corge as corge, _grault as grault };
-export var {
+} = {
+  funn: 'not fun',
+  quuy: 'quuy',
+  rando: 1
+}; // array pattern
+
+funn = _$rwProx(funn, "funn", () => funn, val => funn = val);
+quux = _$rwProx(quux, "quux", () => quux, val => quux = val);
+quuz = _$rwProx(quuz, "quuz", () => quuz, val => quuz = val);
+other = _$rwProx(other, "other", () => other, val => other = val);
+var [bunt, corge = 1, ...grault] = ['bunt', 'corge', 'grault1', 'grault2']; // nested object pattern
+
+bunt = _$rwProx(bunt, "bunt", () => bunt, val => bunt = val);
+corge = _$rwProx(corge, "corge", () => corge, val => corge = val);
+grault = _$rwProx(grault, "grault", () => grault, val => grault = val);
+var {
   a: aa = 10,
   b: {
     bb = 5
   }
 } = {
   a: 3
-};
-var _baz = baz,
-    _rest = rest,
-    _foo = foo,
-    _ham = ham,
-    _eggs = eggs,
-    _aa = aa,
-    _bb = bb;
-export function rewire$baz($stub) {
-  baz = $stub;
-}
-export function rewire$rest($stub) {
-  rest = $stub;
-}
-export function rewire$foo($stub) {
-  foo = $stub;
-}
-export function rewire$ham($stub) {
-  ham = $stub;
-}
-export function rewire$eggs($stub) {
-  eggs = $stub;
-}
-export function rewire$aa($stub) {
-  aa = $stub;
-}
-export function rewire$bb($stub) {
-  bb = $stub;
-}
-export function rewire$quuz($stub) {
-  _quuz = $stub;
-}
-export function rewire$other($stub) {
-  _other = $stub;
-}
-export function rewire$quux($stub) {
-  _quux = $stub;
-}
-export function rewire$corge($stub) {
-  _corge = $stub;
-}
-export function rewire$grault($stub) {
-  _grault = $stub;
-}
-export function restore() {
-  baz = _baz;
-  rest = _rest;
-  foo = _foo;
-  ham = _ham;
-  eggs = _eggs;
-  aa = _aa;
-  bb = _bb;
-  _quuz = quuz;
-  _other = other;
-  _quux = quux;
-  _corge = corge;
-  _grault = grault;
-}
+}; // nested array pattern
+
+aa = _$rwProx(aa, "aa", () => aa, val => aa = val);
+bb = _$rwProx(bb, "bb", () => bb, val => bb = val);
+var [[records]] = [['records', 'tapes', 'cds']]; // object pattern with array pattern in it
+
+records = _$rwProx(records, "records", () => records, val => records = val);
+var {
+  something: [nestedArray]
+} = {
+  something: [1, 2]
+}; // array pattern with object pattern in it
+
+nestedArray = _$rwProx(nestedArray, "nestedArray", () => nestedArray, val => nestedArray = val);
+var [{
+  foo: bippy
+}] = [{
+  foo: 'test'
+}];
+bippy = _$rwProx(bippy, "bippy", () => bippy, val => bippy = val);
+export { funn, quux, quuz, other, bunt, corge, grault, aa, bb, records, nestedArray, bippy, _$rwRuntime as __RewireAPI__ };

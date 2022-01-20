@@ -1,54 +1,35 @@
-var bar = function* bar() {
-  yield baz;
-};
+import _rewireProxyRuntime from '/Users/itaylor/os/babel-plugin-rewire-exports/src/rewireProxyRuntime';
 
-var foo = function foo() {
+const {
+  _$rwRuntime,
+  _$rwProx
+} = _rewireProxyRuntime();
+
+var _foo = foo;
+
+var foo = _$rwProx(_foo, "foo", () => foo, val => foo = val);
+
+var _bar = bar;
+
+var bar = _$rwProx(_bar, "bar", () => bar, val => bar = val);
+
+function foo() {
   return bar();
-};
+}
 
-export { foo as default };
-export { bar };
+function* bar() {
+  yield baz;
+}
+
 var baz = true;
-export { bar as qux, baz };
-var whatsit = class whatsit extends foo {};
-export { whatsit };
-const whatnot = false,
-      whatever = true;
-var _whatnot = whatnot;
-var _whatever = whatever;
-export { _whatnot as whatnot, _whatever as whatever };
-var _default = foo,
-    _bar = bar,
-    _qux = bar,
-    _baz = baz,
-    _whatsit = whatsit;
-export function rewire($stub) {
-  foo = $stub;
-}
-export function rewire$bar($stub) {
-  bar = $stub;
-}
-export function rewire$qux($stub) {
-  bar = $stub;
-}
-export function rewire$baz($stub) {
-  baz = $stub;
-}
-export function rewire$whatsit($stub) {
-  whatsit = $stub;
-}
-export function rewire$whatnot($stub) {
-  _whatnot = $stub;
-}
-export function rewire$whatever($stub) {
-  _whatever = $stub;
-}
-export function restore() {
-  foo = _default;
-  bar = _bar;
-  bar = _qux;
-  baz = _baz;
-  whatsit = _whatsit;
-  _whatnot = whatnot;
-  _whatever = whatever;
-}
+baz = _$rwProx(baz, "baz", () => baz, val => baz = val);
+
+class whatsit extends foo {}
+
+whatsit = _$rwProx(whatsit, "whatsit", () => whatsit, val => whatsit = val);
+var whatnot = false;
+whatnot = _$rwProx(whatnot, "whatnot", () => whatnot, val => whatnot = val);
+var whatever = true;
+whatever = _$rwProx(whatever, "whatever", () => whatever, val => whatever = val);
+export default foo;
+export { bar, bar as qux, baz, whatsit, whatnot, whatever, _$rwRuntime as __RewireAPI__ };

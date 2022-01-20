@@ -5,12 +5,14 @@ const {
   _$rwProx
 } = _rewireProxyRuntime();
 
-import * as htmlentity_rewire from './htmlentity'; // FIXME: This is not currently handled correctly.
+import * as htmlentity_rewire from './htmlentity';
 
-let htmlentity = _$rwProx(htmlentity_rewire, "htmlentity", () => htmlentity, val => htmlentity = val);
+var htmlentity = _$rwProx(htmlentity_rewire, "htmlentity", () => htmlentity, val => htmlentity = val);
 
-const {
+var {
   decodeHtmlEntity,
   encodeHtmlEntity
 } = htmlentity;
-export { _$rwRuntime as __RewireAPI__ };
+decodeHtmlEntity = _$rwProx(decodeHtmlEntity, "decodeHtmlEntity", () => decodeHtmlEntity, val => decodeHtmlEntity = val);
+encodeHtmlEntity = _$rwProx(encodeHtmlEntity, "encodeHtmlEntity", () => encodeHtmlEntity, val => encodeHtmlEntity = val);
+export { decodeHtmlEntity, encodeHtmlEntity, _$rwRuntime as __RewireAPI__ };

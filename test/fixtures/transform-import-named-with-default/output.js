@@ -1,19 +1,16 @@
-import _Somelib, { someObj as _whatever } from 'some-non-existent-lib';
-const whatever$ProxyHandler = {};
-const whatever = new Proxy(_whatever, whatever$ProxyHandler);
-const Somelib$ProxyHandler = {};
-const Somelib = new Proxy(_Somelib, Somelib$ProxyHandler);
+import _rewireProxyRuntime from '/Users/itaylor/os/babel-plugin-rewire-exports/src/rewireProxyRuntime';
+
+const {
+  _$rwRuntime,
+  _$rwProx
+} = _rewireProxyRuntime();
+
+import Somelib_rewire, { someObj as whatever_rewire } from 'some-non-existent-lib';
+
+var whatever = _$rwProx(whatever_rewire, "whatever", () => whatever, val => whatever = val);
+
+var Somelib = _$rwProx(Somelib_rewire, "Somelib", () => Somelib, val => Somelib = val);
+
 Somelib.doThing();
 whatever.fooBar();
-export function rewire$Somelib(proxyHandler) {
-  Object.keys(Somelib$ProxyHandler).forEach(k => delete Somelib$ProxyHandler[k]);
-  Object.keys(proxyHandler).forEach(k => Somelib$ProxyHandler[k] = proxyHandler[k]);
-}
-export function rewire$whatever(proxyHandler) {
-  Object.keys(whatever$ProxyHandler).forEach(k => delete whatever$ProxyHandler[k]);
-  Object.keys(proxyHandler).forEach(k => whatever$ProxyHandler[k] = proxyHandler[k]);
-}
-export function restore() {
-  Object.keys(Somelib$ProxyHandler).forEach(k => delete Somelib$ProxyHandler[k]);
-  Object.keys(whatever$ProxyHandler).forEach(k => delete whatever$ProxyHandler[k]);
-}
+export { _$rwRuntime as __RewireAPI__ };

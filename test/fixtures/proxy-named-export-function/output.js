@@ -5,17 +5,18 @@ const {
   _$rwProx
 } = _rewireProxyRuntime();
 
-let foo = _$rwProx({
-  bar: 'bar'
-}, "foo", () => foo, val => foo = val);
+var _barFn = barFn;
 
-let barFn_rewire = _$rwProx(function barFn() {
+var barFn = _$rwProx(_barFn, "barFn", () => barFn, val => barFn = val);
+
+var foo = {
+  bar: 'bar'
+};
+foo = _$rwProx(foo, "foo", () => foo, val => foo = val);
+
+function barFn() {
   const secondLevelVar = foo.bar;
   return secondLevelVar + ' bat';
-}, "barFn", () => barFn);
-
-function barFn(...args) {
-  return barFn_rewire(...args);
 }
 
 export { barFn, _$rwRuntime as __RewireAPI__ };

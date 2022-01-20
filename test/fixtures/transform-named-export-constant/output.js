@@ -1,22 +1,14 @@
-const foo = 'bar',
-      baz = 'qux';
-var _foo = foo;
-var _baz = baz;
-export { _foo as foo, _baz as baz };
-const whatsit = false;
-var _whatsit = whatsit;
-export { _whatsit as whatsit };
-export function rewire$whatsit($stub) {
-  _whatsit = $stub;
-}
-export function rewire$foo($stub) {
-  _foo = $stub;
-}
-export function rewire$baz($stub) {
-  _baz = $stub;
-}
-export function restore() {
-  _whatsit = whatsit;
-  _foo = foo;
-  _baz = baz;
-}
+import _rewireProxyRuntime from '/Users/itaylor/os/babel-plugin-rewire-exports/src/rewireProxyRuntime';
+
+const {
+  _$rwRuntime,
+  _$rwProx
+} = _rewireProxyRuntime();
+
+var foo = 'bar';
+foo = _$rwProx(foo, "foo", () => foo, val => foo = val);
+var baz = 'qux';
+baz = _$rwProx(baz, "baz", () => baz, val => baz = val);
+var whatsit = false;
+whatsit = _$rwProx(whatsit, "whatsit", () => whatsit, val => whatsit = val);
+export { foo, baz, whatsit, _$rwRuntime as __RewireAPI__ };

@@ -5,9 +5,10 @@ const {
   _$rwProx
 } = _rewireProxyRuntime();
 
-import Somelib_rewire from 'some-non-existent-lib';
+import Somelib_rewire, { someFunc as someFunc_rewire } from 'immutable';
+
+var someFunc = _$rwProx(someFunc_rewire, "someFunc", () => someFunc, val => someFunc = val);
 
 var Somelib = _$rwProx(Somelib_rewire, "Somelib", () => Somelib, val => Somelib = val);
 
-Somelib.fooBar();
 export { _$rwRuntime as __RewireAPI__ };

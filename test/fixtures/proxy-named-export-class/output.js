@@ -7,20 +7,26 @@ const {
 
 import { foo as foo_rewire } from "../../import/fakeLibrary";
 
-let foo = _$rwProx(foo_rewire, "foo", () => foo, val => foo = val);
+var foo = _$rwProx(foo_rewire, "foo", () => foo, val => foo = val);
 
-let Foob = _$rwProx(class Foob {
+class Foob {
   someMethod() {
     return 'cool';
   }
 
-}, "Foob", () => Foob, val => Foob = val);
+}
 
-let Bar = _$rwProx(class Bar {
+Foob = _$rwProx(Foob, "Foob", () => Foob, val => Foob = val);
+Foob.staticProp = {
+  nice: 'test'
+};
+
+class Bar {
   doThing() {
     return 0;
   }
 
-}, "Bar", () => Bar, val => Bar = val);
+}
 
+Bar = _$rwProx(Bar, "Bar", () => Bar, val => Bar = val);
 export { Foob, Bar, _$rwRuntime as __RewireAPI__ };

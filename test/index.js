@@ -11,10 +11,8 @@ describe('Plugin', () => {
     babelrc: false,
     plugins: [plugin]
   };
-
- // ['proxy-export-class'].map((caseName) => {
   fs.readdirSync(fixturesDir).map((caseName) => {
-    if (!caseName.startsWith('proxy')) return;
+//    if (!caseName.startsWith('proxy')) return;
     const fixtureDir = path.join(fixturesDir, caseName);
     const inputPath = path.join(fixtureDir, 'input.js');
 
