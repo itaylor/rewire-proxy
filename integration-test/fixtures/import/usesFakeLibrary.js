@@ -11,3 +11,8 @@ export function doAllTheThings() {
 export function biffIt() {
   return biff;
 }
+
+const yepVar = 'yep';
+export function yep() {
+  return yepVar;
+}

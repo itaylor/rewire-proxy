@@ -6,7 +6,6 @@ export default function ({types: t}) {
   const defaultIdentifier = t.identifier('default');
 
   const buildRewireObjects = template(`
- //   import _rewireProxyRuntime from '${__dirname}/rewireProxyRuntime';
     import _rewireProxyRuntime from '@itaylor/rewire-proxy-runtime';
   `);
 

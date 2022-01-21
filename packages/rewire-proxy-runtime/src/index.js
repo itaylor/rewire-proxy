@@ -2,6 +2,7 @@ const proxyMap = new WeakMap();
 const proxyHandlerMap = new WeakMap();
 const proxySet = new WeakSet();
 const recursionMarker = Symbol('recursionMarker');
+const allRewired = new Set();
 
 export default function createRewireProxyRuntime() {
   const _rewireObjects = {};
@@ -15,7 +16,7 @@ export default function createRewireProxyRuntime() {
     };
     const rw = _rewireObjects[name];
 
-    if ((type === 'function' || type === 'object') && !(obj instanceof RegExp) && !(obj instanceof Set) && !(obj instanceof Map) && (obj && !obj._isMockFunction)) {
+    if ((type === 'function' || type === 'object') && (obj && !obj._isMockFunction)) {
       let p;
       if (proxySet.has(obj)) {
         p = obj;
@@ -24,7 +25,7 @@ export default function createRewireProxyRuntime() {
         p = proxyMap.get(obj);
       }
       if (!p) {
-        const ph = {};
+        const ph = makeObjectProxyHandler({});
         p = new Proxy(obj, ph);
         proxyHandlerMap.set(p, ph);
         proxyMap.set(obj, p);
@@ -61,7 +62,7 @@ export default function createRewireProxyRuntime() {
       Object.keys(ph).forEach(k => delete ph[k]);
       Object.keys(newProxyHandler).forEach(k => ph[k] = newProxyHandler[k]);
     },
-    __Rewire__: (name, val) => {
+    rewire: (name, val) => {
       const rw = _rewireObjects[name];
       if (!rw) {
         _toRewireObjects[name] = val;
@@ -70,77 +71,114 @@ export default function createRewireProxyRuntime() {
       let needsSetWithSetter = true;
       if (rw.proxy) {
         if (typeof val === 'function') {
-          that.rewireProxy(name, {
-            apply: (target, thisArg, args) => {
-              if (val[recursionMarker]) {
-                delete val[recursionMarker];
-                return Reflect.apply(target, thisArg, args);
-              } else {
-                val[recursionMarker] = true;
-                try {
-                  return val(...args);
-                } finally {
-                  delete val[recursionMarker];
-                }
-              }
-            },
-            construct: (target, args) => {
-              if (val[recursionMarker]) {
-                delete val[recursionMarker];
-                return Reflect.construct(target, args);
-              }
-              val[recursionMarker] = true;
-              try {
-                const result = new val(...args);
-                return result;
-              } finally {
-                delete val[recursionMarker];
-              }
-            }
-          });
+          that.rewireProxy(name, makeFunctionProxyHandler(val));
           needsSetWithSetter = false;
         }
         if (typeof val === 'object') {
-          that.rewireProxy(name, {
-            get: (target, prop, receiver) => {
-              if (val[prop] !== undefined) {
-                return val[prop];
-              }
-              return Reflect.get(target, prop, receiver);
-            }
-          });
+          that.rewireProxy(name, makeObjectProxyHandler(val));
           needsSetWithSetter = false;
         }
       }
       if (needsSetWithSetter) {
-        if (!rw.setterFn) {
-          throw new Error(`Tried to rewire a value to a type it cannot convert to: ${name}`);
+        if (rw.preRewired === undefined) {
+          rw.preRewired = rw.getterFn();
         }
-        rw.preRewired = rw.getterFn();
         rw.setterFn(val);
       }
+      allRewired.add(rw);
+      return () => that.restore(name);
     },
-    __ResetDependency__: function (name) {
+    restore: function (name) {
       if (_toRewireObjects[name]) {
         delete _toRewireObjects[name];
       }
 
       const rw = _rewireObjects[name];
-      if (!rw) return; // throw new Error('Cannot rewire ' + name);
+      if (!rw) return;
 
-      if (rw.proxy) {
-        const ph = proxyHandlerMap.get(rw.proxy);
-        Object.keys(ph).forEach(k => delete ph[k]);
-      } else if (rw.setterFn) {
-        if (rw.preRewired) {
-          rw.setterFn(rw.preRewired);
-          delete rw.preRewired;
-        }
-      }
+      restoreOne(rw); 
+    },
+    grab: function (name) {
+      return _rewireObjects[name]?.getterFn();
     }
   };
+  that.__get__ = that.grab;
+  that.__set__ = that.rewire;
+  that.__Rewire__ = that.rewire;
+  that.__ResetDependency__ = that.restore;
+  that.__GetDependency__ = that.grab;
+  that.restoreAll = restoreAll;
   return {
     _$rwProx,
     _$rwRuntime: that
   };
 }
+
+function restoreAll() {
+  allRewired.forEach((rw) => {
+    restoreOne(rw);
+    allRewired.delete(rw);
+  });
+}
+
+function restoreOne(rw) {
+  if (rw.proxy) {
+    const ph = proxyHandlerMap.get(rw.proxy);
+    Object.keys(ph).forEach(k => delete ph[k]);
+    const newPh = makeObjectProxyHandler({});
+    Object.keys(newPh).forEach(k => ph[k] = newPh[k]);
+  } else if (rw.setterFn) {
+    if (rw.preRewired !== undefined) {
+      rw.setterFn(rw.preRewired);
+      delete rw.preRewired;
+    }
+  }
+}
+
+function makeFunctionProxyHandler(val) {
+  return  {
+    apply: (target, thisArg, args) => {
+      if (val[recursionMarker]) {
+        delete val[recursionMarker];
+        return Reflect.apply(target, thisArg, args);
+      } else {
+        val[recursionMarker] = true;
+        try {
+          return val(...args);
+        } finally {
+          delete val[recursionMarker];
+        }
+      }
+    },
+    construct: (target, args) => {
+      if (val[recursionMarker]) {
+        delete val[recursionMarker];
+        return Reflect.construct(target, args);
+      }
+      val[recursionMarker] = true;
+      try {
+        const result = new val(...args);
+        return result;
+      } finally {
+        delete val[recursionMarker];
+      }
+    }
+  };
+}
+
+function makeObjectProxyHandler(val) {
+  return {
+    get: (target, prop, receiver) => {
+      if (val[prop] !== undefined) {
+        return val[prop];
+      }
+      const result = Reflect.get(target, prop, receiver);
+      if (typeof result === 'function') {
+        return result.bind(target);
+      }
+      return result;
+    }
+  };
+}
+
+globalThis.__rewire_reset_all__ = restoreAll;

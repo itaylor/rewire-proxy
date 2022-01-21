@@ -10,6 +10,6 @@
     ]
   ],
   "plugins": [
-    "../lib/index.js"
+    "../packages/babel-plugin-rewire-proxy/lib/index.js"
   ]
 }

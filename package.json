@@ -1,7 +1,7 @@
 {
   "name": "@itaylor/rewire-proxy",
   "private": true,
-  "version": "0.0.7",
+  "version": "0.0.10",
   "description": "Monorepo for rewire-proxy babel plugin",
   "main": "lib/index.js",
   "scripts": {
@@ -11,7 +11,8 @@
     "test": "yarn lint && yarn mocha --require @babel/register",
     "test:watch": "yarn run test -- --watch",
     "prepack": "yarn run clean && yarn run build",
-    "integration-test": "yarn run build && cd integration-test && mocha --require ../test/babel-polyfill *.test.js"
+    "publish": "yarn workspaces foreach run pub",
+    "integration-test": "yarn run build && cd integration-test && mocha --require @babel/register *.test.js"
   },
   "repository": {
     "type": "git",
