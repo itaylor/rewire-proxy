@@ -173,7 +173,7 @@ function makeObjectProxyHandler(val) {
         return val[prop];
       }
       const result = Reflect.get(target, prop, receiver);
-      if (typeof result === 'function') {
+      if (typeof result === 'function' && Object.keys(result).length === 0) {
         return result.bind(target);
       }
       return result;
