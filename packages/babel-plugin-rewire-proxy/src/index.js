@@ -1,5 +1,7 @@
 import template from '@babel/template';
 
+const ignoreRegEx = /(^|\s?)rewire-ignore(\s|$)/;
+
 export default function ({types: t}) {
   const VISITED = Symbol('visited');
 
@@ -61,9 +63,13 @@ export default function ({types: t}) {
     name: 'rewire-proxies',
     visitor: {
       Program: {
-        enter(_, state) {
+        enter(path, state) {
           state.exports = [];
           state.hoistedFunctions = [];
+          const ignored = !!state?.file?.ast?.comments?.find((c) => ignoreRegEx.test(c.value));
+          if (ignored) {
+            path.stop();
+          }
         },
         exit(path, {exports, hoistedFunctions} ) {
           exports.push({ local: t.identifier('_$rwRuntime'), external: t.identifier('__RewireAPI__') });

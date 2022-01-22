@@ -1,3 +1,4 @@
+// rewire-ignore
 const proxyMap = new WeakMap();
 const proxyHandlerMap = new WeakMap();
 const proxySet = new WeakSet();

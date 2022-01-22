@@ -1,7 +1,75 @@
 # babel-plugin-rewire-proxy
 
 This started as a fork of [babel-plugin-rewire-exports](asapach/babel-plugin-rewire-exports) that was going to allow imports as well as exports to be rewired, but ended up as a reimplmentation of most of the [babel-plugin-rewire](https://github.com/speedskater/babel-plugin-rewire) API but using ES6 proxies.
-## Understanding what it does vs what `babel-plugin-rewire` does
+
+## Installation
+
+```
+npm install -D @itaylor/babel-plugin-rewire-proxy @itaylor/rewire-proxy-runtime
+#  or
+yarn add --dev @itaylor/babel-plugin-rewire-proxy @itaylor/rewire-proxy-runtime
+```
+## API
+This offers a complete implementation of the APIs defined by `babel-plugin-rewire`, while also adding some non alises that are not underscore prefixed/suffixed.
+
+To get access to the rewire API, import `__RewireAPI__` from the file you wish to rewire.
+```js
+import foo, { __RewireAPI__ } from 'path/to/my/file.js'
+```
+Then you can use the following methods:
+## `rewire(name: string, val: any)` 
+Changes the rewired file so that the named variable will return the specified value
+
+Arguments:
+| `name`  | `string` | The name of the variable to rewire.
+| `value` | `any`    | The value to rewire the variable with.  
+
+Returns: 
+ `function` | Call this function to reset the variable to the value it had before being rewired. 
+
+Aliases: `__Rewire__`, `__set__`
+
+## `grab(name: string)`
+Fetches a value from a rewired file.   Can retrieve values that are not exported.
+
+Arguments:
+| `name`  | `string` | The name of the variable to grab.
+
+Returns: 
+| `unknown` | The value of the variable with the name passed in, or `undefined` if it doesn't exist |
+
+Aliases: `__get__`, `__GetDependency__`
+
+## `restore(name: string)`
+Restores a previously rewired object to its pre-rewired value
+
+Arguments:
+| `name`  | `string` | The name of the variable to restore.
+
+Returns: `undefined`
+
+Aliases: `__ResetDependency__`
+
+## `restoreAll()`
+Restores all rewired objects to their pre-rewired value;
+
+Returns: `undefined`
+
+Aliases: `globalThis.__rewire_reset_all__`
+
+## Preventing files from being processed by this plugin
+
+If there are files that you do not wish to have this plugin process, add a comment containing
+`rewire-ignore` to the file.  The entire file will be skipped by this plugin.  This is advisable for libraries that serve as wrappers over `__RewireAPI__`, and can also be used an an escape hatch to work around bugs with the plugin's transforms.
+
+```js 
+// rewire-ignore
+function someFunctionIDontWantRewired() {
+  spookyStuffHere();
+}
+```
+
+## Understanding differences between this and `babel-plugin-rewire` 
 
 Both of these plugins allow users to change the behavior inside of modules from outside of the module, without modifying the code.  This implements most of the same API as `babel-plugin-rewire`, but it works very differently.  To illustrate here's a simple piece of example code:
 
