@@ -68,7 +68,7 @@ export default function ({types: t}) {
           state.hoistedFunctions = [];
           const ignored = !!state?.file?.ast?.comments?.find((c) => ignoreRegEx.test(c.value));
           if (ignored) {
-            path.stop();
+            path.skip();
           }
         },
         exit(path, {exports, hoistedFunctions} ) {
