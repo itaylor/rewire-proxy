@@ -68,10 +68,11 @@ export default function ({types: t}) {
           state.hoistedFunctions = [];
           const ignored = !!state?.file?.ast?.comments?.find((c) => ignoreRegEx.test(c.value));
           if (ignored) {
-            path.skip();
+            markVisited(path.node);
           }
         },
         exit(path, {exports, hoistedFunctions} ) {
+          if (path.node[VISITED]) return;
           exports.push({ local: t.identifier('_$rwRuntime'), external: t.identifier('__RewireAPI__') });
           let defaultExport = null;
           let otherExportSpecifiers = [];
