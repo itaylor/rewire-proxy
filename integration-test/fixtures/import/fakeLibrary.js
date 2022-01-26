@@ -12,3 +12,8 @@ export const bar = {
 };
 
 export const biff = 7;
+
+export const arr = [
+  biff,
+  2
+];

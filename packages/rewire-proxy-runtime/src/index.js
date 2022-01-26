@@ -151,10 +151,10 @@ function makeFunctionProxyHandler(val) {
         }
       }
     },
-    construct: (target, args) => {
+    construct: (target, args, newTarget) => {
       if (val[recursionMarker]) {
         delete val[recursionMarker];
-        return Reflect.construct(target, args);
+        return Reflect.construct(target, args, newTarget);
       }
       val[recursionMarker] = true;
       try {
@@ -167,17 +167,25 @@ function makeFunctionProxyHandler(val) {
   };
 }
 
+function bindIfSafeAndNeeded(possiblyFunction, target) {
+  if (typeof possiblyFunction === 'function' && Object.keys(possiblyFunction).length === 0) {
+    return possiblyFunction.bind(target);
+  }
+  return possiblyFunction;
+}
+
 function makeObjectProxyHandler(val) {
   return {
+    _debugVal: val,
     get: (target, prop, receiver) => {
+      if (Array.isArray(val)) {
+        return bindIfSafeAndNeeded(val[prop], val);
+      }
       if (val[prop] !== undefined) {
         return val[prop];
       }
       const result = Reflect.get(target, prop, receiver);
-      if (typeof result === 'function' && Object.keys(result).length === 0) {
-        return result.bind(target);
-      }
-      return result;
+      return bindIfSafeAndNeeded(result, target);
     }
   };
 }
