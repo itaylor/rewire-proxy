@@ -1,6 +1,6 @@
 {
   "name": "@itaylor/rewire-proxy-runtime",
-  "version": "0.0.16",
+  "version": "0.0.17",
   "description": "Runtime library for babel-plugin-rewire-proxy",
   "main": "lib/index.js",
   "scripts": {

@@ -66,13 +66,14 @@ export default function ({types: t}) {
         enter(path, state) {
           state.exports = [];
           state.hoistedFunctions = [];
+          state.ignore = false;
           const ignored = !!state?.file?.ast?.comments?.find((c) => ignoreRegEx.test(c.value));
           if (ignored) {
-            markVisited(path.node);
+            state.ignore = true;
           }
         },
-        exit(path, {exports, hoistedFunctions} ) {
-          if (path.node[VISITED]) return;
+        exit(path, { exports, hoistedFunctions, ignore }) {
+          if (path.node[VISITED] || ignore) return;
           exports.push({ local: t.identifier('_$rwRuntime'), external: t.identifier('__RewireAPI__') });
           let defaultExport = null;
           let otherExportSpecifiers = [];
@@ -104,8 +105,8 @@ export default function ({types: t}) {
           path.unshiftContainer('body', [markVisited(buildRewireObjects({})), varDecl, ...hoisted,]);
         }
       },
-      VariableDeclaration(path) {
-        if (path.node[VISITED]) return;
+      VariableDeclaration(path, { ignore }) {
+        if (path.node[VISITED] || ignore) return;
         if (path?.scope?.block?.type === 'Program') {
           // only modify top level variables 
           // don't modify "private" funcs prefixed with _ (babel adds some)
@@ -133,16 +134,16 @@ export default function ({types: t}) {
           path.insertAfter(replacements);
         }
       },
-      ClassDeclaration(path) {
-        if (path.node[VISITED]) return;
+      ClassDeclaration(path,  { ignore }) {
+        if (path.node[VISITED] || ignore) return;
         if (path?.parent?.type === 'Program') {
           // convert ClassDecl to ClassExpression
           // path.node.type = 'ClassExpression';
           path.insertAfter(markAllVisited(buildProxyTemplate(path.node.id)));
         }
       },
-      FunctionDeclaration(path, { hoistedFunctions }) {
-        if (path.node[VISITED]) return;
+      FunctionDeclaration(path, { hoistedFunctions, ignore }) {
+        if (path.node[VISITED] || ignore) return;
         if (path?.parent?.type === 'Program') {
           // only modify top level functions
 
@@ -153,8 +154,8 @@ export default function ({types: t}) {
           hoistedFunctions.push({ origId, newId: newId.name });
         }
       },      
-      ImportDeclaration(path) {
-        if (path.node[VISITED]) return;
+      ImportDeclaration(path, { ignore }) {
+        if (path.node[VISITED] || ignore) return;
         const specifiers = path.node.specifiers;
         for (const s of specifiers) {
           if (s.type === 'ImportDefaultSpecifier' || s.type === 'ImportSpecifier' || s.type === 'ImportNamespaceSpecifier' ) {
@@ -171,8 +172,8 @@ export default function ({types: t}) {
         path.replaceWith(markVisited(t.ImportDeclaration(specifiers, path.node.source)));
       },
       // export default
-      ExportDefaultDeclaration(path, {exports}) {
-        if (path.node[VISITED]) return;
+      ExportDefaultDeclaration(path, { exports, ignore }) {
+        if (path.node[VISITED] || ignore) return;
         
         const declaration = path.node.declaration;
         const isIdentifier = t.isIdentifier(declaration);
@@ -198,8 +199,8 @@ export default function ({types: t}) {
         }
       },
       // export {}
-      ExportNamedDeclaration(path, {exports}) {
-        if (path.node[VISITED]) return;
+      ExportNamedDeclaration(path, { exports, ignore }) {
+        if (path.node[VISITED] || ignore) return;
         // export { foo } from './bar.js'
         if (path.node.source) return;
 
