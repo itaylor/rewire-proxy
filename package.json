@@ -1,7 +1,7 @@
 {
   "name": "@itaylor/rewire-proxy",
   "private": true,
-  "version": "0.0.10",
+  "version": "0.0.12",
   "description": "Monorepo for rewire-proxy babel plugin",
   "main": "lib/index.js",
   "scripts": {
