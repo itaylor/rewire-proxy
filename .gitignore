@@ -40,3 +40,5 @@ jspm_packages
 /lib
 packages/*/lib
 .yarn/cache
+
+packages/babel-plugin-rewire-proxy/README.md
