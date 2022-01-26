@@ -4,13 +4,36 @@ This started as a fork of [babel-plugin-rewire-exports](asapach/babel-plugin-rew
 
 ## Installation
 
-```
+```sh
 npm install -D @itaylor/babel-plugin-rewire-proxy @itaylor/rewire-proxy-runtime
 #  or
 yarn add --dev @itaylor/babel-plugin-rewire-proxy @itaylor/rewire-proxy-runtime
 ```
+
+Then, add this plugin in your `.babelrc` or `.babel.config.js`
+
+```json
+{
+  "presets": [ "@babel/preset-env" ],
+  "plugins": [ "@itaylor/babel-plugin-rewire-proxy" ]
+}
+```
+
+You may prefer to run the `rewire-proxy` at test time, and not in your production code.
+A common way to achieve this is to use the [`env`](https://babeljs.io/docs/en/options#env) property of the babel config.
+This works by merging the config for when the `NODE_ENV` var is set to `test`. (Jest sets that env var, and easy to do in Mocha as well).
+```json
+{ 
+  "presets": ["@babel/preset-env"],
+  "env": {
+    "test": {
+      "plugins": [ "@itaylor/babel-plugin-rewire-proxy" ]
+    }
+  }
+}
+```
 ## API
-This offers a complete implementation of the APIs defined by `babel-plugin-rewire`, while also adding some non alises that are not underscore prefixed/suffixed.
+This offers a complete implementation of the APIs defined by `babel-plugin-rewire`, while also adding some alises that are not underscore prefixed/suffixed and are IMO friendlier to use.
 
 To get access to the rewire API, import `__RewireAPI__` from the file you wish to rewire.
 ```js
@@ -30,7 +53,7 @@ Returns:
 Aliases: `__Rewire__`, `__set__`
 
 ## `grab(name: string)`
-Fetches a value from a rewired file.   Can retrieve values that are not exported.
+Fetches a value/proxy from the top scope of a rewired file.   Can retrieve values that are not exported.
 
 Arguments:
 | `name`  | `string` | The name of the variable to grab.
@@ -80,7 +103,7 @@ export default function readMyFileAndMakeItBetter(fileName) {
 }
 ```
 
-Here's a vastly simplified example of what `babel-plugin-rewire` is trying to do that code.  It's changing lookups from static to dynamic, so that they can be overwritten later.
+Here's a vastly simplified example of what `babel-plugin-rewire` is trying to do that code.  It's changing the code to make lookups within the code dynamic, so that they can be overwritten later, and exposing an API that allows that overriding to happen.
 ```js
 import { readFileSync } from 'fs';
 const __rewired = { readFileSync };
@@ -93,10 +116,10 @@ export { __RewireAPI__: {
   __Rewire__: (name, val) => __rewired[name] = val; 
 }}
 ```
-I can now call `__RewireAPI__.__Rewire__('readFileSync', () => 'hello')` from any other class and the output of `readMyFileAndMakeItBetter` will change.
+I can now call `__RewireAPI__.__Rewire__('readFileSync', () => 'hello')` from any other file and the output of `readMyFileAndMakeItBetter` will change.
 
-Here's a vastly simplified example of what this plugin is trying to do to the same code.  It's changing
-top level references to ES6 proxies that target that reference, then allowing to control the Proxy Handler at a later time.
+Here's a vastly simplified example of what this plugin is trying to do to the same code.  It's changing objects in the top 
+top level scope to ES6 proxies that target that reference, then allowing to control the Proxy Handler at a later time.
 ```js
 import { readFileSync as _readFileSync } from 'fs';
 const _proxyHandlers = { readFileSync: {} });
@@ -111,8 +134,7 @@ export { __RewireAPI__ : {
   }
 }
 ```
-Now I can call the same API: `__RewireAPI__.__Rewire__('readFileSync', () => 'hello')` on this module and get the same result.  The main difference is that `babel-plugin-rewire-proxy` *will not ever* change the code within your functions/classes.  Instead it changes names of variables that are in the top level scope of your functions.  This is less invasive and therefore inherently less prone to weird bugs.
-
+Now I can call the same API: `__RewireAPI__.__Rewire__('readFileSync', () => 'hello')` on this module and get the same result.  The main difference is that `babel-plugin-rewire-proxy` *will not ever* change the code within your functions/classes.  Instead it changes names of variables that are in the top level scope of your functions.  This is less invasive and therefore inherently less prone to weird bugs and interactions with other plugins/language features.
 ## Other differences with `babel-plugin-rewire`
 * Relies on a runtime API that is imported instead of compiling the entirety of the rewire implementation in to each function.  This results in needing to install two packages, but the amount of additional code added to each file is minimal.  
 * Exports don't change equality when rewired.   
@@ -136,4 +158,4 @@ fooVar === 5 // true
 fooBarBefore === fooVar; // false
 ```
 ## Should I use this?
-If you're starting from zero and looking for a way to mock things for tests, probably not.  I tend to agree with [@thekashey](https://dev.to/thekashey/please-stop-playing-with-proxyquire-11j4) that these sorts of tools are fun toys to play with, but not fit for responsible use.  However, if you're already using `babel-plugin-rewire` in a large codebase and are looking for a way to migrate to something less invasive and which is more compatible with ES modules and all their import/export syntax, then this might be a good choice.
+If you're looking for a way to override things in your production code, probably not, it's likely better to just fork the code you're trying to override and deal with it that way.  If you're wanting to mock code for tests, then maybe.  The big advantage of this over other mocking tools is the ability to alter single functions/methods/objects within a file without altering the rest of the file, and without having to manually create mocks for everything else in the file.  If you're already using `babel-plugin-rewire`, and are looking for a less invasive, more up-to-date version of its API, then yes perhaps you'd like to give this a try.  It should only take a few minutes to swap plugins and rerun your tests.  In general, I tend to agree with [@thekashey](https://dev.to/thekashey/please-stop-playing-with-proxyquire-11j4) that these sorts of tools are fun toys to play with, but not fit for responsible use.
