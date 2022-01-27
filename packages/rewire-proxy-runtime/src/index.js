@@ -26,7 +26,7 @@ export default function createRewireProxyRuntime() {
         p = proxyMap.get(obj);
       }
       if (!p) {
-        const ph = makeObjectProxyHandler({});
+        const ph = makeObjectProxyHandler();
         p = new Proxy(obj, ph);
         proxyHandlerMap.set(p, ph);
         proxyMap.set(obj, p);
@@ -76,7 +76,11 @@ export default function createRewireProxyRuntime() {
           needsSetWithSetter = false;
         }
         if (typeof val === 'object') {
-          that.rewireProxy(name, makeObjectProxyHandler(val));
+          if (Array.isArray(val)) {
+            that.rewireProxy(name, makeArrayProxyHandler(val));
+          } else {
+            that.rewireProxy(name, makeObjectProxyHandler(val));
+          }          
           needsSetWithSetter = false;
         }
       }
@@ -126,7 +130,7 @@ function restoreOne(rw) {
   if (rw.proxy) {
     const ph = proxyHandlerMap.get(rw.proxy);
     Object.keys(ph).forEach(k => delete ph[k]);
-    const newPh = makeObjectProxyHandler({});
+    const newPh = makeObjectProxyHandler();
     Object.keys(newPh).forEach(k => ph[k] = newPh[k]);
   } else if (rw.setterFn) {
     if (rw.preRewired !== undefined) {
@@ -175,18 +179,48 @@ function bindIfSafeAndNeeded(possiblyFunction, target) {
 }
 
 function makeObjectProxyHandler(val) {
+  if (val === undefined) {
+    return {
+      get: (target, prop, receiver) => {
+        const result = Reflect.get(target, prop, receiver);
+        return bindIfSafeAndNeeded(result, target);
+      }
+    };
+  }
   return {
     _debugVal: val,
     get: (target, prop, receiver) => {
-      if (Array.isArray(val)) {
-        return bindIfSafeAndNeeded(val[prop], val);
-      }
-      if (val[prop] !== undefined) {
+      if (prop in val) {
         return val[prop];
       }
       const result = Reflect.get(target, prop, receiver);
       return bindIfSafeAndNeeded(result, target);
-    }
+    },
+    has(target, key) {
+      return key in val;
+    },
+    ownKeys: () => {
+      return Reflect.ownKeys(val);
+    },
+    getOwnPropertyDescriptor: (obj, propertyKey) => {
+      return Reflect.getOwnPropertyDescriptor(val, propertyKey);
+    },
+    set: (target, property, value) => {
+      val[property] = value;
+      return value;
+    }    
+  };
+}
+
+function makeArrayProxyHandler(val) {
+  if (val === undefined) {
+    return {};
+  } 
+  return {
+    _debugVal: val,
+    get: (target, prop) => {
+      return bindIfSafeAndNeeded(val[prop], val);
+    },
   };
 }
 

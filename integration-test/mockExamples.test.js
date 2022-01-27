@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { arr, __RewireAPI__ } from './fixtures/import/fakeLibrary.js';
+import { arr, obj, __RewireAPI__ } from './fixtures/import/fakeLibrary.js';
 
 import { FakeClass, __RewireAPI__ as classRewire } from './fixtures/import/FakeClass'; 
 
@@ -35,10 +35,71 @@ describe('Arrays', () => {
     assert.equal(arr[0], 7);
     assert.deepStrictEqual(arr, [7, 2]);
   });
+
+  it('should support for of when rewired', () => {
+    const { rewire, restore } = __RewireAPI__;
+    assert.deepStrictEqual(arr, [7, 2]);
+    const newArr = ['something', 'what', 'works']; 
+    rewire('arr', newArr);
+    let count = 0;
+    for (const v of arr) {
+      assert.strictEqual(v, newArr[count]);
+      count++;
+    }
+    assert.strictEqual(count, 3);
+    restore('arr');
+    assert.deepStrictEqual(arr, [7, 2]);
+  });
+
+});
+
+describe('Objects', () => {
+  it('should correctly handle keys/values', () => {
+    const { rewire, restore } = __RewireAPI__;
+    assert.strictEqual(obj.biff, 7);
+    assert.strictEqual(obj.val, 2);
+    assert.deepStrictEqual(Object.keys(obj), ['biff', 'val']);
+    assert.deepStrictEqual(Object.values(obj), [7, 2]);
+   
+    rewire('obj', {
+      aDifferent: 'object',
+      somethingElse: true,
+      val: 1
+    });
+    assert.strictEqual(obj.val, 1);
+    assert.deepStrictEqual(Object.keys(obj), ['aDifferent', 'somethingElse', 'val']);
+    assert.deepStrictEqual(Object.values(obj), ['object', true, 1]);
+   
+    restore('obj');
+    assert.strictEqual(obj.biff, 7);
+    assert.strictEqual(obj.val, 2);
+    assert.deepStrictEqual(Object.keys(obj), ['biff', 'val']);
+    assert.deepStrictEqual(Object.values(obj), [7, 2]);
+  });
+  
+  it('should handle get/set', () => {
+    const { rewire, restore } = __RewireAPI__;
+    rewire('obj', {
+      aDifferent: 'object',
+      somethingElse: true,
+      val: 1
+    });
+    obj.val = 4;
+    obj.another = 10;
+    assert.strictEqual(obj.val, 4);
+    assert.strictEqual(obj.another, 10);
+    assert.deepStrictEqual(Object.keys(obj), ['aDifferent', 'somethingElse', 'val', 'another']);
+    assert.deepStrictEqual(Object.values(obj), ['object', true, 4, 10]);
+    restore('obj');
+    assert.strictEqual(obj.biff, 7);
+    assert.strictEqual(obj.val, 2);
+    assert.deepStrictEqual(Object.keys(obj), ['biff', 'val']);
+    assert.deepStrictEqual(Object.values(obj), [7, 2]);
+  });
 });
 
 describe('Classes', () => {
-  it('it should rewire classes with other classes', () => {
+  it('should rewire classes with other classes', () => {
     const { rewire } = classRewire;
     const fc = new FakeClass();
     assert.strictEqual(fc.doesSomethingLame(), false);

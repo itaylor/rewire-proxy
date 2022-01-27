@@ -1,6 +1,6 @@
 {
   "name": "@itaylor/babel-plugin-rewire-proxy",
-  "version": "0.0.17",
+  "version": "0.0.18",
   "description": "Babel plugin that enables rewiring of code for mocking/testing purposes",
   "main": "lib/index.js",
   "scripts": {
@@ -37,7 +37,7 @@
     "@babel/template": "7"
   },
   "peerDependencies": {
-    "@itaylor/rewire-proxy-runtime": "0.0.17"
+    "@itaylor/rewire-proxy-runtime": "0.0.18"
   },
   "devDependencies": {
     "@babel/cli": "7",

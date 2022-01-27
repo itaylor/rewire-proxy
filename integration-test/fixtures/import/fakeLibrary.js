@@ -17,3 +17,7 @@ export const arr = [
   biff,
   2
 ];
+export const obj = {
+  biff,
+  val: 2
+};
